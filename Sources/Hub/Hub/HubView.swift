@@ -98,6 +98,16 @@ struct HubView: View {
     @State private var dropSuccess = false
     @State private var pulseOpacity: CGFloat = 0.3
     
+    /// 首次使用引导状态
+    @State private var showOnboarding = false
+    @State private var hasCheckedOnboarding = false
+    
+    /// 获取首次引导状态
+    private var shouldShowOnboarding: Bool {
+        let settings = HubSettings()
+        return !settings.hasCompletedOnboarding
+    }
+    
     // MARK: - Computed Properties
     
     /// 顶部圆角半径
@@ -194,6 +204,22 @@ struct HubView: View {
         .padding(.bottom, 8)
         .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
         .padding(.bottom, LayoutConstants.hubBottomPadding)
+        // 首次使用引导
+        .overlay {
+            if showOnboarding {
+                OnboardingView {
+                    completeOnboarding()
+                }
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .onAppear {
+            checkAndShowOnboarding()
+        }
+        // 监听应用激活，重新检查引导状态
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            checkAndShowOnboarding()
+        }
         // ESC 键关闭
         .onExitCommand {
             if vm.hubState == .open {
@@ -474,6 +500,38 @@ struct HubView: View {
         let type = StashedItem.inferFileType(from: name)
         let newItem = StashedItem(name: name, fileType: type, originalPath: path)
         modelContext.insert(newItem)
+    }
+
+    /// 完成首次引导
+    private func completeOnboarding() {
+        withAnimation(.easeOut(duration: 0.3)) {
+            showOnboarding = false
+        }
+        
+        // 标记引导已完成
+        var settings = HubSettings()
+        settings.hasCompletedOnboarding = true
+        hasCheckedOnboarding = true
+        
+        // 展开Hub展示功能
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            vm.open()
+        }
+    }
+
+    /// 检查并显示首次引导
+    private func checkAndShowOnboarding() {
+        // 已检查过或已显示，不再重复
+        guard !hasCheckedOnboarding && !showOnboarding else { return }
+        
+        if shouldShowOnboarding {
+            hasCheckedOnboarding = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                    showOnboarding = true
+                }
+            }
+        }
     }
 
     /// 检查是否需要收起 Hub（当暂存区为空且不悬停时）

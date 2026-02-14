@@ -47,6 +47,7 @@ struct HubSettings {
         static let position = "hub.position"
         static let floatingX = "hub.floatingX"
         static let floatingY = "hub.floatingY"
+        static let hasCompletedOnboarding = "hub.hasCompletedOnboarding"
     }
     
     // MARK: - Properties
@@ -101,6 +102,12 @@ struct HubSettings {
     var floatingY: CGFloat {
         get { CGFloat(defaults.double(forKey: Keys.floatingY)) }
         set { defaults.set(Double(newValue), forKey: Keys.floatingY) }
+    }
+
+    /// 是否已完成首次引导
+    var hasCompletedOnboarding: Bool {
+        get { defaults.bool(forKey: Keys.hasCompletedOnboarding) }
+        set { defaults.set(newValue, forKey: Keys.hasCompletedOnboarding) }
     }
     
     // MARK: - Methods
