@@ -43,6 +43,8 @@ struct StashedContentView: View {
             // 文件网格
             fileGridView
             
+            Spacer(minLength: 0) // 新增：将页脚推向底部
+            
             // Footer
             footerView
         }
@@ -238,7 +240,7 @@ struct StashedContentView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
-        .frame(height: 32)
+        .padding(.bottom, 20) // 增加：提升至 20pt 彻底解决触底感
     }
 }
 

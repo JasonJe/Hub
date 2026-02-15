@@ -63,53 +63,49 @@ struct HubView: View {
                     .frame(width: vm.hubSize.width, height: vm.hubSize.height, alignment: .top)
                     .background(
                         ZStack {
-                            // 1. 核心材质
+                            // 1. 内部深度：极淡的次表面色彩
+                            currentHubShape
+                                .fill(LinearGradient(colors: [Color.blue.opacity(0.05), Color.cyan.opacity(0.02)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            
+                            // 2. 核心材质：极致通透
                             currentHubShape.fill(.ultraThinMaterial)
                             
-                            // 2. 液态流光
+                            // 3. 表面流光：使用 plusLighter 增强亮度
                             currentHubShape
                                 .fill(
                                     LinearGradient(
-                                        colors: [.clear, .white.opacity(0.04), .clear],
+                                        colors: [.clear, .white.opacity(0.12), .clear],
                                         startPoint: UnitPoint(x: shimmerOffset, y: 0),
-                                        endPoint: UnitPoint(x: shimmerOffset + 0.5, y: 1)
+                                        endPoint: UnitPoint(x: shimmerOffset + 0.3, y: 1)
                                     )
                                 )
+                                .blendMode(.plusLighter)
                                 .onAppear {
-                                    withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
+                                    withAnimation(.linear(duration: 5).repeatForever(autoreverses: false)) {
                                         shimmerOffset = 1.5
                                     }
                                 }
-                            
-                            // 3. 顶部全局高光
-                            currentHubShape.fill(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.12), .white.opacity(0.03), .clear],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
                         }
                     )
                     .clipShape(currentHubShape)
                     .overlay(
                         ZStack {
-                            // 外层深邃边框
+                            // 4. 基础折射边框
                             currentHubShape.stroke(
                                 LinearGradient(
-                                    colors: [.white.opacity(0.3), .white.opacity(0.1), .white.opacity(0.02)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                lineWidth: 1.5
-                            )
-                            
-                            // 极细折射高亮边缘
-                            currentHubShape.stroke(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.6), .clear, .clear],
+                                    colors: [.white.opacity(0.4), .white.opacity(0.1), .clear, .white.opacity(0.05)],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.2
+                            )
+                            
+                            // 5. 极锐利镜面高光 (Specular Highlight)
+                            currentHubShape.stroke(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.8), .white.opacity(0.2), .clear],
+                                    startPoint: .topLeading,
+                                    endPoint: UnitPoint(x: 0.3, y: 0.3)
                                 ),
                                 lineWidth: 0.5
                             )

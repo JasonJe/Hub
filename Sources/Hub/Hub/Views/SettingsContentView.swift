@@ -26,6 +26,8 @@ struct SettingsContentView: View {
             // 设置内容
             settingsContent
             
+            Spacer(minLength: 0) // 新增：将版权信息推向底部
+            
             // Footer
             footerView
         }
@@ -105,7 +107,7 @@ struct SettingsContentView: View {
             Spacer()
         }
         .padding(.horizontal, 16)
-        .frame(height: 40)
+        .padding(.bottom, 20) // 增加：提升至 20pt
     }
     
     // MARK: - Helpers

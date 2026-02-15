@@ -68,25 +68,44 @@ struct OnboardingView: View {
     
     private var glassBackground: some View {
         ZStack {
+            // 1. 次表面深度
+            openedShape.fill(LinearGradient(colors: [Color.blue.opacity(0.05), Color.cyan.opacity(0.02)], startPoint: .topLeading, endPoint: .bottomTrailing))
+            
+            // 2. 核心材质
             openedShape.fill(.ultraThinMaterial)
+            
+            // 3. 全局光泽
             openedShape.fill(
                 LinearGradient(
-                    colors: [.white.opacity(0.12), .white.opacity(0.03), .clear],
+                    colors: [.white.opacity(0.1), .white.opacity(0.02), .clear],
                     startPoint: .top,
-                    endPoint: UnitPoint(x: 0.5, y: 0.6)
+                    endPoint: .bottom
                 )
             )
         }
         .clipShape(openedShape)
         .overlay(
-            openedShape.stroke(
-                LinearGradient(
-                    colors: [.white.opacity(0.5), .white.opacity(0.25), .white.opacity(0.1), .white.opacity(0.02)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                ),
-                lineWidth: 1
-            )
+            ZStack {
+                // 4. 折射边框
+                openedShape.stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.4), .white.opacity(0.1), .clear, .white.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.2
+                )
+                
+                // 5. 极锐利镜面高光
+                openedShape.stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.8), .clear, .clear],
+                        startPoint: .topLeading,
+                        endPoint: UnitPoint(x: 0.3, y: 0.3)
+                    ),
+                    lineWidth: 0.5
+                )
+            }
         )
     }
     
