@@ -27,6 +27,9 @@ struct DraggableItemView: View {
         ZStack {
             // 文件项内容
             fileItemContent
+                .scaleEffect(isHovering ? 1.05 : 1.0)
+                .shadow(color: .black.opacity(isHovering ? 0.2 : 0), radius: 10, x: 0, y: 5)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
 
             // 拖拽处理器
             DraggableOverlay(

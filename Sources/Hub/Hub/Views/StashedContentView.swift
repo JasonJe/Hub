@@ -17,6 +17,12 @@ struct StashedContentView: View {
     /// 打开设置的回调
     var onOpenSettings: () -> Void
     
+    /// 同步弹窗状态到父视图
+    @Binding var isShowingAlert: Bool
+    
+    /// 触发指定弹窗的回调
+    var onShowDialog: (HubDialogType) -> Void
+    
     @Environment(\.modelContext) private var modelContext
     
     /// 文件网格列配置
@@ -78,10 +84,10 @@ struct StashedContentView: View {
 
             Spacer()
 
-            // 一键清空按钮 - Liquid Glass 风格
+            // 一键清空按钮
             if !items.isEmpty {
                 Button(action: {
-                    clearAllItems()
+                    onShowDialog(.clearAll)
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "trash")
@@ -219,7 +225,7 @@ struct StashedContentView: View {
             
             // 退出按钮
             Button(action: {
-                NSApp.terminate(nil)
+                onShowDialog(.exit)
             }) {
                 HStack(spacing: 4) {
                     Image(systemName: "power")
@@ -237,7 +243,7 @@ struct StashedContentView: View {
 }
 
 #Preview {
-    StashedContentView(items: [], onOpenSettings: {})
+    StashedContentView(items: [], onOpenSettings: {}, isShowingAlert: .constant(false), onShowDialog: { _ in })
         .frame(width: 360, height: 220)
         .background(.black)
 }

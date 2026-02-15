@@ -42,13 +42,29 @@ final class DragDetector {
         let validTypes: [NSPasteboard.PasteboardType] = [
             .fileURL,
             NSPasteboard.PasteboardType(UTType.url.identifier),
-            .string
+            .string,
+            .html,
+            .tiff,
+            .png
         ]
-        return dragPasteboard.types?.contains(where: validTypes.contains) ?? false
+        return dragPasteboard.types?.contains(where: { type in
+            validTypes.contains(type)
+        }) ?? false
+    }
+
+    /// 检查是否有辅助功能权限（全局监听某些事件需要）
+    private func checkAccessibilityPermissions() -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false]
+        let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        if !accessEnabled {
+            HubLogger.drag("Accessibility permissions not granted. Global drag detection may be limited.")
+        }
+        return accessEnabled
     }
     
     func startMonitoring() {
         stopMonitoring()
+        _ = checkAccessibilityPermissions()
         
         // 跟踪粘贴板以检测内容拖动
         mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
@@ -64,11 +80,13 @@ final class DragDetector {
             guard let self = self else { return }
             guard self.isDragging else { return }
             
-            let newContent = self.dragPasteboard.changeCount != self.pasteboardChangeCount
-            
             // 检测是否正在拖动实际内容且是有效内容
-            if newContent && !self.isContentDragging && self.hasValidDragContent() {
-                self.isContentDragging = true
+            // 只要粘贴板计数器发生变化，就认为可能开始了内容拖拽
+            if !self.isContentDragging && self.dragPasteboard.changeCount != self.pasteboardChangeCount {
+                if self.hasValidDragContent() {
+                    self.isContentDragging = true
+                    HubLogger.drag("Content dragging detected")
+                }
             }
             
             // 仅在拖动内容时处理位置
@@ -81,21 +99,24 @@ final class DragDetector {
                 if containsMouse && !self.hasEnteredHubRegion {
                     self.hasEnteredHubRegion = true
                     self.onDragEntersHubRegion?()
+                    HubLogger.drag("Drag entered hub region")
                 } else if !containsMouse && self.hasEnteredHubRegion {
                     self.hasEnteredHubRegion = false
                     self.onDragExitsHubRegion?()
+                    HubLogger.drag("Drag exited hub region")
                 }
             }
         }
         
         mouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] _ in
             guard let self = self else { return }
-            guard self.isDragging else { return }
-
+            
             // 鼠标松开代表拖拽结束
-            // 如果之前进入了 Hub 区域，发送退出通知（无论当前鼠标位置）
-            if self.hasEnteredHubRegion {
-                self.onDragExitsHubRegion?()
+            if self.isDragging {
+                if self.hasEnteredHubRegion {
+                    self.onDragExitsHubRegion?()
+                }
+                HubLogger.drag("Drag session ended")
             }
 
             self.isDragging = false
