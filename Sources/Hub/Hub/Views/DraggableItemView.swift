@@ -33,7 +33,7 @@ struct DraggableItemView: View {
                 filePath: item.originalPath,
                 fileName: item.name,
                 onDragCompleted: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                         modelContext.delete(item)
                     }
                 },
@@ -48,7 +48,7 @@ struct DraggableItemView: View {
 
     private var deleteButton: some View {
         Button(action: {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
                 modelContext.delete(item)
             }
         }) {
@@ -70,16 +70,33 @@ struct DraggableItemView: View {
     
     private var fileItemContent: some View {
         VStack(spacing: 4) {
-            // 文件图标
+            // 文件图标 - Liquid Glass 风格
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.2))
+                // 玻璃片背景
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
                     .frame(width: 64, height: 64)
+                    // 边框光泽
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(isHovering ? Color.blue : Color.white.opacity(0.05),
-                                    lineWidth: isHovering ? 2 : 1)
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                isHovering ? Color.blue.opacity(0.4) : .white.opacity(0.2),
+                                lineWidth: 0.5
+                            )
                     )
+                    // 顶部液态高光
+                    .overlay(alignment: .top) {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.25), .white.opacity(0.08), .clear],
+                                    startPoint: .top,
+                                    endPoint: UnitPoint(x: 0.5, y: 0.5)
+                                )
+                            )
+                            .frame(height: 32)
+                            .clipped()
+                    }
 
                 // 使用系统图标
                 let nsImage = NSWorkspace.shared.icon(forFile: item.originalPath)
@@ -99,7 +116,7 @@ struct DraggableItemView: View {
             // 文件名
             Text(item.name)
                 .font(.system(size: 9))
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(width: 64)

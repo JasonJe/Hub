@@ -63,60 +63,93 @@ struct OnboardingView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // 纯黑背景，与Hub主页面一致
-                Color.black
+                // macOS 26 Liquid Glass - 极致透明玻璃效果
+                ZStack {
+                    // 核心：超透明材质模糊
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                    
+                    // 玻璃光泽层：轻柔顶部高光
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.25),
+                                    .white.opacity(0.1),
+                                    .white.opacity(0.03),
+                                    .clear
+                                ],
+                                startPoint: .top,
+                                endPoint: UnitPoint(x: 0.5, y: 0.6)
+                            )
+                        )
+                }
                 
                 // 主内容 - 添加顶部padding避免被刘海遮挡
                 VStack(spacing: 12) {
-                    // 动画箭头区域
+                    // 动画箭头区域 - Liquid Glass 风格（参考松手暂存页面）
                     ZStack {
-                        // 外层光晕
+                        // 玻璃片背景
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .frame(width: 56, height: 56)
+                            .overlay(
+                                Circle()
+                                    .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                            )
+                            // 顶部液态高光
+                            .overlay(alignment: .top) {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.25), .white.opacity(0.08), .clear],
+                                            startPoint: .top,
+                                            endPoint: UnitPoint(x: 0.5, y: 0.5)
+                                        )
+                                    )
+                                    .frame(width: 56, height: 28)
+                                    .clipped()
+                            }
+                        
+                        // 外层脉冲光晕
+                        Circle()
+                            .stroke(
+                                Color.blue.opacity(glowOpacity * 0.6),
+                                lineWidth: 2.5
+                            )
+                            .frame(width: 62, height: 62)
+                            .blur(radius: 2)
+                            .onAppear {
+                                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                                    glowOpacity = 0.9
+                                }
+                            }
+                        
+                        // 内层光晕 - 四层渐变
                         Circle()
                             .fill(
                                 RadialGradient(
                                     colors: [
-                                        Color.blue.opacity(glowOpacity),
-                                        Color.blue.opacity(glowOpacity * 0.3),
-                                        Color.clear
+                                        Color.blue.opacity(glowOpacity * 0.4),
+                                        Color.blue.opacity(glowOpacity * 0.2),
+                                        Color.blue.opacity(0.05),
+                                        .clear
                                     ],
                                     center: .center,
-                                    startRadius: 10,
-                                    endRadius: 40
+                                    startRadius: 6,
+                                    endRadius: 19
                                 )
                             )
-                            .frame(width: 80, height: 80)
-                            .onAppear {
-                                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                                    glowOpacity = 0.6
-                                }
-                            }
-                        
-                        // 内层圆环
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Color.blue.opacity(0.8), Color.blue.opacity(0.4)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 2
-                            )
-                            .frame(width: 44, height: 44)
+                            .frame(width: 38, height: 38)
                         
                         // 箭头
                         Image(systemName: "arrow.up")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.blue, .blue.opacity(0.7)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.blue)
                             .offset(y: arrowOffset)
                             .onAppear {
-                                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                                    arrowOffset = -5
+                                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                                    arrowOffset = -6
                                 }
                             }
                     }
@@ -125,56 +158,77 @@ struct OnboardingView: View {
                     VStack(spacing: 5) {
                         Text("欢迎使用 Hub")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         
                         VStack(spacing: 2) {
                             Text("将鼠标移至刘海区域")
                                 .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(.secondary)
                             
                             Text("拖放文件即可暂存")
                                 .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.5))
+                                .foregroundColor(.secondary.opacity(0.7))
                         }
                     }
                     
-                    // 按钮
+                    // 按钮 - Liquid Glass 风格
                     Button(action: {
-                        withAnimation(.easeIn(duration: 0.15)) {
-                            showContent = false
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            onComplete()
-                        }
+                        onComplete()
                     }) {
                         Text("开始使用")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.white)
-                            .frame(width: 100, height: 32)
+                            .frame(width: 120, height: 38)
                             .background(
-                                LinearGradient(
-                                    colors: [Color.blue, Color.blue.opacity(0.8)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                                Capsule()
+                                    .fill(.blue)
+                                    .overlay(
+                                        Capsule()
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [.white.opacity(0.3), .white.opacity(0.1), .clear],
+                                                    startPoint: .top,
+                                                    endPoint: UnitPoint(x: 0.5, y: 0.5)
+                                                )
+                                            )
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                                    )
                             )
-                            .cornerRadius(16)
-                            .shadow(color: .blue.opacity(0.3), radius: 4, y: 2)
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.top, 28) // 顶部留出刘海空间
+                .padding(.top, 32) // 顶部留出刘海空间
                 .padding(.bottom, 20) // 底部留出空间
                 .opacity(showContent ? 1 : 0)
-                .offset(y: showContent ? 0 : 8)
+                .offset(y: showContent ? 0 : 10)
                 .onAppear {
-                    withAnimation(.easeOut(duration: 0.3).delay(0.2)) {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.2)) {
                         showContent = true
                     }
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
-            .clipShape(NotchStyleShape(bottomCornerRadius: 24))
+            .clipShape(NotchStyleShape(bottomCornerRadius: 20))
+            // 玻璃边框：轻柔高光边框
+            .overlay(
+                NotchStyleShape(bottomCornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.5),
+                                .white.opacity(0.25),
+                                .white.opacity(0.1),
+                                .white.opacity(0.02)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            )
         }
     }
 }

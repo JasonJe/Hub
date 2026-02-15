@@ -32,7 +32,7 @@ struct StashedContentView: View {
             // Header
             headerView
             
-            Divider().background(Color.white.opacity(0.05))
+            Divider().background(.white.opacity(0.08))
             
             // 文件网格
             fileGridView
@@ -47,35 +47,59 @@ struct StashedContentView: View {
     private var headerView: some View {
         HStack(spacing: 8) {
             Text("暂存区")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(.white)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.primary)
 
+            // 计数徽章 - Liquid Glass 风格
             Text("\(items.count)")
-                .font(.system(size: 10, weight: .bold))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.gray.opacity(0.25))
-                .cornerRadius(4)
-                .foregroundColor(.gray)
+                .font(.system(size: 10, weight: .semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Capsule()
+                                .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                        )
+                        .overlay(alignment: .top) {
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.25), .clear],
+                                        startPoint: .top,
+                                        endPoint: .center
+                                    )
+                                )
+                                .frame(height: 10)
+                        }
+                )
+                .foregroundColor(.secondary)
 
             Spacer()
 
-            // 一键清空按钮
+            // 一键清空按钮 - Liquid Glass 风格
             if !items.isEmpty {
                 Button(action: {
                     clearAllItems()
                 }) {
-                    HStack(spacing: 2) {
+                    HStack(spacing: 4) {
                         Image(systemName: "trash")
-                            .font(.system(size: 10))
+                            .font(.system(size: 9))
                         Text("清空")
                     }
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.red.opacity(0.8))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.red.opacity(0.15))
-                    .cornerRadius(6)
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                Capsule()
+                                    .stroke(.red.opacity(0.2), lineWidth: 0.5)
+                            )
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -89,7 +113,7 @@ struct StashedContentView: View {
 
     /// 清空所有暂存项
     private func clearAllItems() {
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
             for item in items {
                 modelContext.delete(item)
             }
@@ -120,38 +144,58 @@ struct StashedContentView: View {
                     }
             }
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 16)
     }
     
     /// 空状态视图
     private var emptyStateView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             Spacer()
             
-            // 图标
+            // 图标 - Liquid Glass 风格
             ZStack {
                 Circle()
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(width: 60, height: 60)
+                    .fill(.ultraThinMaterial)
+                    .frame(width: 64, height: 64)
+                    .overlay(
+                        Circle()
+                            .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                    )
+                    // 顶部液态高光
+                    .overlay(alignment: .top) {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.25), .white.opacity(0.08), .clear],
+                                    startPoint: .top,
+                                    endPoint: UnitPoint(x: 0.5, y: 0.5)
+                                )
+                            )
+                            .frame(width: 64, height: 32)
+                            .clipped()
+                    }
                 
                 Image(systemName: "square.and.arrow.down")
-                    .font(.system(size: 24))
-                    .foregroundColor(.gray.opacity(0.5))
+                    .font(.system(size: 24, weight: .light))
+                    .foregroundColor(.secondary)
             }
             
             // 提示文本
-            VStack(spacing: 4) {
+            VStack(spacing: 5) {
                 Text("暂存区为空")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(.primary)
                 
                 Text("拖放文件到这里暂存")
-                    .font(.system(size: 10))
-                    .foregroundColor(.gray.opacity(0.6))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
             }
             
             Spacer()
         }
+        .padding(.top, 8)
         .frame(height: 110)
     }
     
@@ -167,7 +211,7 @@ struct StashedContentView: View {
                     Text("设置")
                 }
                 .font(.system(size: 10))
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
             
@@ -183,7 +227,7 @@ struct StashedContentView: View {
                     Text("退出")
                 }
                 .font(.system(size: 10))
-                .foregroundColor(.red.opacity(0.8))
+                .foregroundColor(.red)
             }
             .buttonStyle(.plain)
         }

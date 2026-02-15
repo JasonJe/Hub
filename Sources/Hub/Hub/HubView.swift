@@ -13,22 +13,23 @@ import UniformTypeIdentifiers
 
 /// 动画参数常量
 private enum AnimationConstants {
-    /// Hub 展开动画 - spring 参数
-    static let openAnimationResponse: Double = 0.42
-    static let openAnimationDamping: Double = 0.8
+    /// Hub 展开动画 - Liquid Glass 风格 spring 参数
+    /// 更柔和、流畅的液体流动感
+    static let openAnimationResponse: Double = 0.5
+    static let openAnimationDamping: Double = 0.75
     static let openAnimationBlendDuration: Double = 0
     
-    /// Hub 收起动画 - spring 参数
-    static let closeAnimationResponse: Double = 0.45
-    static let closeAnimationDamping: Double = 1.0
+    /// Hub 收起动画 - Liquid Glass 风格 spring 参数
+    static let closeAnimationResponse: Double = 0.4
+    static let closeAnimationDamping: Double = 0.85
     static let closeAnimationBlendDuration: Double = 0
     
     /// 拖拽状态过渡动画时长
-    static let dragTransitionDuration: Double = 0.15
+    static let dragTransitionDuration: Double = 0.25
     
     /// 拖拽成功动画 - spring 参数
-    static let dropSuccessResponse: Double = 0.3
-    static let dropSuccessDamping: Double = 0.6
+    static let dropSuccessResponse: Double = 0.35
+    static let dropSuccessDamping: Double = 0.7
     
     /// 拖拽成功状态保持时长（秒）
     static let dropSuccessHoldDuration: Double = 1.5
@@ -39,8 +40,8 @@ private enum AnimationConstants {
     /// 拖拽失败时重置状态延迟（秒）
     static let dragFailureResetDelay: Double = 1.0
     
-    /// 悬停效果动画时长
-    static let hoverEffectDuration: Double = 0.2
+    /// 悬停效果动画时长 - Liquid Glass 风格
+    static let hoverEffectDuration: Double = 0.3
 }
 
 // MARK: - Layout Constants
@@ -156,14 +157,47 @@ struct HubView: View {
                                     .frame(alignment: .top)
                                     .padding(.horizontal, vm.hubState == .open ? LayoutConstants.hubHorizontalPadding : 0)
                                     .padding(.bottom, vm.hubState == .open ? LayoutConstants.hubVerticalPadding : 0)
-                                    .background(.black)
+                                    // macOS 26 Liquid Glass - 极致透明玻璃效果
+                                    .background(
+                                        ZStack {
+                                            // 核心：超透明材质模糊
+                                            currentHubShape
+                                                .fill(.ultraThinMaterial)
+                                            
+                                            // 玻璃光泽层：轻柔顶部高光
+                                            currentHubShape
+                                                .fill(
+                                                    LinearGradient(
+                                                        colors: [
+                                                            .white.opacity(0.25),
+                                                            .white.opacity(0.1),
+                                                            .white.opacity(0.03),
+                                                            .clear
+                                                        ],
+                                                        startPoint: .top,
+                                                        endPoint: UnitPoint(x: 0.5, y: 0.6)
+                                                    )
+                                                )
+                                        }
+                                    )
                                     .clipShape(currentHubShape)
-                                    .overlay(alignment: .top) {
-                                        Rectangle()
-                                            .fill(.black)
-                                            .frame(height: 1)
-                                            .padding(.horizontal, topCornerRadius)
-                                    }
+                                    // 玻璃边框：明亮高光边框
+                                    .overlay(
+                                        currentHubShape
+                                            .stroke(
+                                                LinearGradient(
+                                                    colors: [
+                                                        .white.opacity(0.5),
+                                                        .white.opacity(0.25),
+                                                        .white.opacity(0.1),
+                                                        .white.opacity(0.02)
+                                                    ],
+                                                    startPoint: .top,
+                                                    endPoint: .bottom
+                                                ),
+                                                lineWidth: 1
+                                            )
+                                    )
                                     .frame(height: vm.hubState == .open ? vm.hubSize.height : nil)
                                     // 使用 spring 动画
                                     .animation(vm.hubState == .open ?
@@ -187,13 +221,13 @@ struct HubView: View {
                 // chin 区域
                 if chinHeight > 0 {
                     Rectangle()
-                        .fill(Color.black.opacity(0.01))
+                        .fill(Color.clear)
                         .frame(width: vm.closedHubSize.width, height: chinHeight)
                 }
             }
             // 拖拽状态下的过渡动画
             .opacity(isDragging ? 0 : 1)
-            .animation(.easeInOut(duration: AnimationConstants.dragTransitionDuration), value: isDragging)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isDragging)
             
             // 拖拽提示层（拖拽状态）
             if isDragging {
@@ -279,7 +313,7 @@ struct HubView: View {
                         .opacity(vm.showSettings ? 1 : 0)
                         .offset(x: vm.showSettings ? 0 : 30)
                     }
-                    .animation(.easeInOut(duration: 0.25), value: vm.showSettings)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: vm.showSettings)
                     .frame(height: vm.hubSize.height)
                 } else {
                     // 闭合状态内容
@@ -309,38 +343,116 @@ struct HubView: View {
         .padding(.horizontal, LayoutConstants.dragOverlayHorizontalPadding)
         .padding(.bottom, LayoutConstants.dragOverlayBottomPadding)
         .frame(width: vm.hubSize.width, height: vm.hubSize.height)
-        .background(dropSuccess ? Color.black.opacity(0.7) : Color.black.opacity(0.9))
-        .clipShape(currentHubShape)
-        .overlay {
-            // 边框脉冲效果（仅拖拽中状态）
-            if !dropSuccess {
+        // macOS 26 Liquid Glass - 极致透明玻璃效果
+        .background(
+            ZStack {
+                // 核心：超透明材质模糊
                 currentHubShape
-                    .stroke(
-                        Color.blue.opacity(pulseOpacity),
-                        lineWidth: 2
+                    .fill(.ultraThinMaterial)
+                
+                // 玻璃光泽层：轻柔顶部高光
+                currentHubShape
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.25),
+                                .white.opacity(0.1),
+                                .white.opacity(0.03),
+                                .clear
+                            ],
+                            startPoint: .top,
+                            endPoint: UnitPoint(x: 0.5, y: 0.6)
+                        )
                     )
-                    .onAppear {
-                        // 启动脉冲动画
-                        withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                            pulseOpacity = 0.8
-                        }
-                    }
-                    .onDisappear {
-                        // 重置状态
-                        pulseOpacity = 0.3
-                    }
             }
+        )
+        .clipShape(currentHubShape)
+        // 边框光泽 + 脉冲效果
+        .overlay {
+            if dropSuccess {
+                // 成功状态 - 绿色边框
+                ZStack {
+                    currentHubShape
+                        .stroke(
+                            LinearGradient(
+                                colors: [.green.opacity(0.6), .green.opacity(0.4), .green.opacity(0.2)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                    currentHubShape
+                        .stroke(Color.green.opacity(0.4), lineWidth: 4)
+                        .blur(radius: 3)
+                }
+            } else {
+                // 拖拽中状态 - 蓝色脉冲
+                ZStack {
+                    // 外层发光脉冲
+                    currentHubShape
+                        .stroke(
+                            Color.blue.opacity(pulseOpacity * 0.7),
+                            lineWidth: 4
+                        )
+                        .blur(radius: 3)
+                    
+                    // 内层边框
+                    currentHubShape
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    .blue.opacity(pulseOpacity * 0.8),
+                                    .blue.opacity(pulseOpacity * 0.5),
+                                    .blue.opacity(pulseOpacity * 0.3)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                }
+            }
+        }
+        // 边框脉冲动画
+        .onAppear {
+            if !dropSuccess {
+                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                    pulseOpacity = 0.9
+                }
+            }
+        }
+        .onDisappear {
+            pulseOpacity = 0.3
         }
     }
     
-    /// 拖拽成功视图
+    /// 拖拽成功视图 - Liquid Glass 风格
     private var successView: some View {
         VStack(spacing: LayoutConstants.contentSpacing) {
             ZStack {
+                // 玻璃片背景
                 Circle()
-                    .fill(Color.green.opacity(0.3))
+                    .fill(.ultraThinMaterial)
                     .frame(width: LayoutConstants.successIconCircleSize, height: LayoutConstants.successIconCircleSize)
+                    .overlay(
+                        Circle()
+                            .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                    )
+                    // 顶部液态高光
+                    .overlay(alignment: .top) {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.25), .white.opacity(0.08), .clear],
+                                    startPoint: .top,
+                                    endPoint: UnitPoint(x: 0.5, y: 0.5)
+                                )
+                            )
+                            .frame(width: LayoutConstants.successIconCircleSize, height: LayoutConstants.successIconCircleSize / 2)
+                            .clipped()
+                    }
                 
+                // 成功图标
                 Image(systemName: "checkmark")
                     .font(.system(size: LayoutConstants.successIconCheckmarkSize, weight: .bold))
                     .foregroundStyle(Color.green)
@@ -348,35 +460,70 @@ struct HubView: View {
             
             VStack(spacing: LayoutConstants.textSpacing) {
                 Text("已暂存")
-                    .font(.system(size: LayoutConstants.primaryTextSize, weight: .bold))
-                    .foregroundColor(.white)
+                    .font(.system(size: LayoutConstants.primaryTextSize, weight: .semibold))
+                    .foregroundColor(.primary)
                 
                 Text("File stashed")
                     .font(.system(size: LayoutConstants.secondaryTextSize))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .tracking(LayoutConstants.letterSpacing)
             }
         }
     }
     
-    /// 拖拽中视图
+    /// 拖拽中视图 - Liquid Glass 风格
     private var draggingView: some View {
         VStack(spacing: LayoutConstants.contentSpacing) {
             ZStack {
+                // 玻璃片背景
                 Circle()
-                    .stroke(Color.blue.opacity(0.5), lineWidth: LayoutConstants.dragIconBorderWidth)
+                    .fill(.ultraThinMaterial)
                     .frame(width: LayoutConstants.dragIconCircleSize, height: LayoutConstants.dragIconCircleSize)
-                    .opacity(0.6)
+                    .overlay(
+                        Circle()
+                            .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                    )
+                    // 顶部液态高光
+                    .overlay(alignment: .top) {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.25), .white.opacity(0.08), .clear],
+                                    startPoint: .top,
+                                    endPoint: UnitPoint(x: 0.5, y: 0.5)
+                                )
+                            )
+                            .frame(width: LayoutConstants.dragIconCircleSize, height: LayoutConstants.dragIconCircleSize / 2)
+                            .clipped()
+                    }
                 
+                // 外层脉冲光晕
                 Circle()
-                    .fill(Color.gray.opacity(0.3))
+                    .stroke(
+                        Color.blue.opacity(pulseOpacity * 0.6),
+                        lineWidth: 3
+                    )
+                    .frame(width: LayoutConstants.dragIconCircleSize + 8, height: LayoutConstants.dragIconCircleSize + 8)
+                    .blur(radius: 2)
+                
+                // 内层光晕
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.blue.opacity(pulseOpacity * 0.4),
+                                Color.blue.opacity(pulseOpacity * 0.2),
+                                Color.blue.opacity(0.05),
+                                .clear
+                            ],
+                            center: .center,
+                            startRadius: 10,
+                            endRadius: LayoutConstants.dragIconInnerCircleSize / 2
+                        )
+                    )
                     .frame(width: LayoutConstants.dragIconInnerCircleSize, height: LayoutConstants.dragIconInnerCircleSize)
                 
-                Circle()
-                    .fill(Color.blue.opacity(0.2))
-                    .frame(width: LayoutConstants.dragIconInnerCircleSize, height: LayoutConstants.dragIconInnerCircleSize)
-                    .blur(radius: LayoutConstants.dragIconBlurRadius)
-                
+                // 箭头
                 Image(systemName: "arrow.down")
                     .font(.system(size: LayoutConstants.dragIconArrowSize, weight: .bold))
                     .foregroundStyle(Color.blue)
@@ -384,12 +531,12 @@ struct HubView: View {
             
             VStack(spacing: LayoutConstants.textSpacing) {
                 Text("松手暂存")
-                    .font(.system(size: LayoutConstants.primaryTextSize, weight: .bold))
-                    .foregroundColor(.white)
+                    .font(.system(size: LayoutConstants.primaryTextSize, weight: .semibold))
+                    .foregroundColor(.primary)
                 
                 Text("Drop to stash")
                     .font(.system(size: LayoutConstants.secondaryTextSize))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .tracking(LayoutConstants.letterSpacing)
             }
         }
@@ -400,7 +547,7 @@ struct HubView: View {
     /// 处理悬停事件
     private func handleHover(_ hovering: Bool) {
         isHovering = hovering
-        withAnimation(.easeInOut(duration: AnimationConstants.hoverEffectDuration)) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             showHoverEffect = hovering
         }
         // 鼠标悬停时自动展开
@@ -504,7 +651,7 @@ struct HubView: View {
 
     /// 完成首次引导
     private func completeOnboarding() {
-        withAnimation(.easeOut(duration: 0.3)) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             showOnboarding = false
         }
         
@@ -513,10 +660,8 @@ struct HubView: View {
         settings.hasCompletedOnboarding = true
         hasCheckedOnboarding = true
         
-        // 展开Hub展示功能
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            vm.open()
-        }
+        // 立即展开 Hub
+        vm.open()
     }
 
     /// 检查并显示首次引导
@@ -527,7 +672,7 @@ struct HubView: View {
         if shouldShowOnboarding {
             hasCheckedOnboarding = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                     showOnboarding = true
                 }
             }

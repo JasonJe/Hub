@@ -21,7 +21,7 @@ struct SettingsContentView: View {
             // Header
             headerView
             
-            Divider().background(Color.white.opacity(0.05))
+            Divider().background(.white.opacity(0.08))
             
             // 设置内容
             settingsContent
@@ -42,17 +42,20 @@ struct SettingsContentView: View {
             Button(action: onClose) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             
             Text("设置")
                 .font(.system(size: 14, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
             
             Spacer()
         }
         .padding(.horizontal, 16)
+        .padding(.top, 4)
         .padding(.bottom, 8)
     }
     
@@ -64,13 +67,13 @@ struct SettingsContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("通用")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                 
                 // 开机自启
                 Toggle(isOn: $launchAtLogin) {
                     Text("开机自启")
                         .font(.system(size: 13))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                 }
                 .toggleStyle(.switch)
                 .onChange(of: launchAtLogin) { _, newValue in
@@ -93,10 +96,10 @@ struct SettingsContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Hub v\(appVersion) (\(appBuild))")
                     .font(.system(size: 10))
-                    .foregroundColor(.gray.opacity(0.5))
-                Text("Copyright © 2026 Jason Je")
+                    .foregroundColor(.secondary.opacity(0.7))
+                Text("Copyright © 2026 JasonJe")
                     .font(.system(size: 9))
-                    .foregroundColor(.gray.opacity(0.3))
+                    .foregroundColor(.secondary.opacity(0.5))
             }
             
             Spacer()

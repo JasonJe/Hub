@@ -31,23 +31,24 @@ enum HubMetrics {
 
     // MARK: - 圆角配置
 
-    /// Hub 在不同状态下的圆角配置
-    /// - opened: 展开状态下，顶部小圆角 (4pt) + 底部大圆角 (32pt) 形成胶囊底部效果
-    /// - closed: 闭合状态下，顶部无圆角 (贴合刘海) + 底部圆角 (24pt) 匹配系统刘海形状
+    /// macOS 26 Liquid Glass 风格圆角配置
+    /// 更大的圆角，更圆润的现代设计
+    /// - opened: 展开状态下，顶部圆角 (16pt) + 底部大圆角 (28pt)
+    /// - closed: 闭合状态下，顶部无圆角 (贴合刘海) + 底部圆角 (20pt)
     static let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (
-        opened: (top: 4, bottom: 32),
-        closed: (top: 0, bottom: 24)
+        opened: (top: 16, bottom: 28),
+        closed: (top: 0, bottom: 20)
     )
 
     // MARK: - 布局调整常量
 
     /// 刘海宽度补偿值
     /// 用于补偿刘海两侧安全区域计算的误差，使 Hub 宽度与刘海完美贴合
-    static let notchWidthCompensation: CGFloat = 4
+    static let notchWidthCompensation: CGFloat = 0
 
     /// Hub 闭合状态下额外宽度
-    /// 使 Hub 宽度略大于刘海，提供更好的视觉效果
-    static let closedHubExtraWidth: CGFloat = 20
+    /// 使 Hub 宽度与刘海对齐，不超出
+    static let closedHubExtraWidth: CGFloat = 0
 
     // MARK: - UI 组件尺寸
 

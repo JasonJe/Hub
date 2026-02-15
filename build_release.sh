@@ -19,14 +19,6 @@ OUTPUT_DIR="./release"
 DMG_NAME="${APP_NAME}.dmg"
 VOLUME_NAME="${APP_NAME}"
 
-# 版本号（从项目文件读取）
-MARKETING_VERSION=$(grep -m1 "MARKETING_VERSION" "${PROJECT_PATH}/project.pbxproj" | sed 's/.*= \(.*\);/\1/' | tr -d ' ')
-BUILD_VERSION=$(grep -m1 "CURRENT_PROJECT_VERSION" "${PROJECT_PATH}/project.pbxproj" | sed 's/.*= \(.*\);/\1/' | tr -d ' ')
-
-# 签名配置（如需签名，设置环境变量 SIGNING_IDENTITY）
-# 示例：export SIGNING_IDENTITY="Developer ID Application: Your Name (XXXXXX)"
-SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"
-
 # 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -49,6 +41,21 @@ log_warning() {
 log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
+
+# 生成时间戳构建号 (格式: YYYYMMDDHHMMSS)
+TIMESTAMP_BUILD=$(date +"%Y%m%d%H%M%S")
+
+# 更新 project.pbxproj 中的 CURRENT_PROJECT_VERSION
+log_info "更新构建号为时间戳: ${TIMESTAMP_BUILD}"
+sed -i '' "s/CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = ${TIMESTAMP_BUILD};/" "${PROJECT_PATH}/project.pbxproj"
+
+# 版本号（从项目文件读取）
+MARKETING_VERSION=$(grep -m1 "MARKETING_VERSION" "${PROJECT_PATH}/project.pbxproj" | sed 's/.*= \(.*\);/\1/' | tr -d ' ')
+BUILD_VERSION="${TIMESTAMP_BUILD}"
+
+# 签名配置（如需签名，设置环境变量 SIGNING_IDENTITY）
+# 示例：export SIGNING_IDENTITY="Developer ID Application: Your Name (XXXXXX)"
+SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"
 
 # 解析参数
 DO_SIGN=false

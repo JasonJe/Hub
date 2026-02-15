@@ -23,27 +23,51 @@ struct IdleContentView: View {
                 
                 Text("Hub")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
             }
             
             Spacer()
             
             // 状态指示器
             if itemCount > 0 {
-                // 有暂存文件时显示数量徽章
+                // 有暂存文件时显示数量徽章 - Liquid Glass 风格
                 Text("\(itemCount)")
-                    .font(.system(size: 10, weight: .bold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.blue)
-                    .clipShape(Capsule())
-                    .foregroundColor(.white)
+                    .font(.system(size: 10, weight: .semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                Capsule()
+                                    .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                            )
+                            .overlay(alignment: .top) {
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.25), .clear],
+                                            startPoint: .top,
+                                            endPoint: .center
+                                        )
+                                    )
+                                    .frame(height: 10)
+                            }
+                    )
+                    .foregroundColor(.secondary)
             } else {
-                // 无暂存文件时显示绿色状态点
+                // 无暂存文件时显示绿色状态点 - 液态光晕
                 Circle()
-                    .fill(Color.green)
-                    .frame(width: 6, height: 6)
-                    .shadow(color: .green.opacity(0.6), radius: 3)
+                    .fill(
+                        RadialGradient(
+                            colors: [.green, .green.opacity(0.5)],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 3
+                        )
+                    )
+                    .frame(width: 8, height: 8)
+                    .shadow(color: .green.opacity(0.4), radius: 3, x: 0, y: 0)
             }
         }
         .padding(.horizontal, 20)
