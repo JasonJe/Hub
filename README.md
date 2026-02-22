@@ -14,6 +14,9 @@ Hub is a temporary file stashing utility located at the top of your screen.
 *   **Stash**: Drag any file to the screen's top (notch area) to store it temporarily.
 *   **Retrieve**: Drag files out from the Hub to any application to use them instantly.
 
+## 📄 License
+This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for more details.
+
 ---
 
 <a name="chinese"></a>
@@ -25,17 +28,6 @@ Hub is a temporary file stashing utility located at the top of your screen.
 Hub 是一款位于屏幕顶部的临时文件暂存工具。
 *   **快速暂存**: 将任何文件拖拽至屏幕顶部（刘海区域）即可完成暂存。
 *   **随时取用**: 将文件从 Hub 窗口直接拖拽至目标应用，即可完成文件的流转与取用。
-
----
-
-<a name="english"></a>
-
-## 📄 License
-This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for more details.
-
----
-
-<a name="chinese"></a>
 
 ## 📄 开源协议
 本项目采用 **Apache License 2.0** 协议开源。详情请参阅 [LICENSE](LICENSE) 文件。
