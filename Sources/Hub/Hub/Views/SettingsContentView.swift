@@ -24,9 +24,11 @@ struct SettingsContentView: View {
             Divider().background(.white.opacity(0.08))
             
             // 设置内容
-            settingsContent
+            ScrollView(showsIndicators: false) {
+                settingsContent
+            }
             
-            Spacer(minLength: 0) // 新增：将版权信息推向底部
+            Spacer(minLength: 0)
             
             // Footer
             footerView
@@ -40,74 +42,110 @@ struct SettingsContentView: View {
     // MARK: - Header
     
     private var headerView: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             Button(action: onClose) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.secondary)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             
             Text("设置")
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundColor(.primary)
             
             Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
     }
     
     // MARK: - Settings Content
     
     private var settingsContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(spacing: 20) {
             // 通用分组
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text("通用")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.secondary)
+                    .padding(.leading, 4)
                 
-                // 开机自启
-                Toggle(isOn: $launchAtLogin) {
-                    Text("开机自启")
-                        .font(.system(size: 13))
-                        .foregroundColor(.primary)
+                // 开机自启 - 使用卡片式设计
+                HStack(spacing: 12) {
+                    Image(systemName: "power")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            Circle()
+                                .fill(.white.opacity(0.08))
+                        )
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("开机自启")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.primary)
+                        
+                        Text("系统启动时自动运行 Hub")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Toggle("", isOn: $launchAtLogin)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .onChange(of: launchAtLogin) { _, newValue in
+                            var settings = HubSettings()
+                            settings.setLaunchAtLogin(newValue)
+                            launchAtLogin = HubSettings.isRegisteredForLaunchAtLogin()
+                        }
                 }
-                .toggleStyle(.switch)
-                .onChange(of: launchAtLogin) { _, newValue in
-                    var settings = HubSettings()
-                    settings.setLaunchAtLogin(newValue)
-                    launchAtLogin = HubSettings.isRegisteredForLaunchAtLogin()
-                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.white.opacity(0.05))
+                )
             }
+            .padding(.horizontal, 20)
             
             Spacer()
         }
-        .padding(16)
+        .padding(.top, 8)
     }
     
     // MARK: - Footer
     
     private var footerView: some View {
-        HStack {
-            // 版本信息
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Hub v\(appVersion) (\(appBuild))")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary.opacity(0.7))
-                Text("Copyright © 2026 JasonJe")
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary.opacity(0.5))
-            }
+        VStack(spacing: 4) {
+            Divider()
+                .background(.white.opacity(0.08))
+                .padding(.horizontal, 20)
             
-            Spacer()
+            HStack {
+                Spacer()
+                
+                // 版本信息
+                VStack(alignment: .center, spacing: 2) {
+                    Text("Hub v\(appVersion) (\(appBuild))")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary.opacity(0.7))
+                    Text("Copyright © 2026 JasonJe")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary.opacity(0.5))
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 20) // 增加：提升至 20pt
     }
     
     // MARK: - Helpers

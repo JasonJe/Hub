@@ -17,11 +17,14 @@ struct StashedContentView: View {
     /// 打开设置的回调
     var onOpenSettings: () -> Void
     
+    /// 返回Hub的回调（当显示设置时使用）
+    var onReturnToHub: (() -> Void)?
+    
     /// 同步弹窗状态到父视图
     @Binding var isShowingAlert: Bool
     
     /// 触发指定弹窗的回调
-    var onShowDialog: (HubDialogType) -> Void
+    var onShowDialog: (HubDialogType, (() -> Void)?) -> Void
     
     @Environment(\.modelContext) private var modelContext
     
@@ -89,7 +92,9 @@ struct StashedContentView: View {
             // 一键清空按钮
             if !items.isEmpty {
                 Button(action: {
-                    onShowDialog(.clearAll)
+                    onShowDialog(.clearAll, {
+                        clearAllItems()
+                    })
                 }) {
                     Text("清空")
                         .font(.system(size: 10, weight: .medium))
@@ -122,6 +127,12 @@ struct StashedContentView: View {
                 modelContext.delete(item)
             }
         }
+    }
+    
+    /// 清空所有暂存项并关闭对话框
+    func clearAllItemsAndDismiss() {
+        clearAllItems()
+        onShowDialog(.clearAll, nil) // 触发dismissDialog
     }
     
     // MARK: - File Grid
@@ -207,23 +218,42 @@ struct StashedContentView: View {
     
     private var footerView: some View {
         HStack {
-            // 设置按钮
-            Button(action: onOpenSettings) {
-                HStack(spacing: 4) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 10))
-                    Text("设置")
+            // 设置按钮 - 如果在设置页面，则显示返回Hub按钮
+            if let returnToHub = onReturnToHub {
+                // 显示返回Hub按钮
+                Button(action: returnToHub) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.left")
+                            .font(.system(size: 10))
+                        Text("返回Hub")
+                    }
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
                 }
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
+                .buttonStyle(.plain)
+            } else {
+                // 显示设置按钮
+                Button(action: {
+                    print("[DEBUG] 设置按钮被点击")
+                    onOpenSettings()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 10))
+                        Text("设置")
+                    }
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             
             Spacer()
             
             // 退出按钮
             Button(action: {
-                onShowDialog(.exit)
+                print("[DEBUG] 退出按钮被点击")
+                onShowDialog(.exit, nil)
             }) {
                 Text("退出")
                     .font(.system(size: 10))
@@ -237,7 +267,7 @@ struct StashedContentView: View {
 }
 
 #Preview {
-    StashedContentView(items: [], onOpenSettings: {}, isShowingAlert: .constant(false), onShowDialog: { _ in })
+    StashedContentView(items: [], onOpenSettings: {}, onReturnToHub: nil, isShowingAlert: .constant(false), onShowDialog: { _, _ in })
         .frame(width: 360, height: 220)
         .background(.black)
 }

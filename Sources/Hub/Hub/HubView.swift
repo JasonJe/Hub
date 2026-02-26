@@ -182,23 +182,42 @@ struct HubView: View {
             if vm.hubState == .open {
                 ZStack {
                     StashedContentView(
-                        items: items, 
-                        onOpenSettings: { vm.openSettings() }, 
+                        items: items,
+                        onOpenSettings: { vm.openSettings() },
                         isShowingAlert: $vm.isShowingAlert,
-                        onShowDialog: { type in vm.showDialog(type) }
+                        onShowDialog: { type, clearAction in vm.showDialog(type, clearAction: clearAction) }
                     )
                         .padding(.top, max(24, vm.closedHubSize.height))
                         .padding(.horizontal, HubMetrics.Layout.hubHorizontalPadding)
-                        .opacity(vm.showSettings ? 0 : 1)
+                        .opacity(vm.showSettings || vm.showConfirmation ? 0 : 1)
                         .offset(x: vm.showSettings ? -30 : 0)
-    
+
                     SettingsContentView(onClose: { vm.closeSettings() })
                         .padding(.top, max(24, vm.closedHubSize.height))
                         .padding(.horizontal, HubMetrics.Layout.hubHorizontalPadding)
-                        .opacity(vm.showSettings ? 1 : 0)
+                        .opacity(vm.showSettings && !vm.showConfirmation ? 1 : 0)
                         .offset(x: vm.showSettings ? 0 : 30)
+
+                    // 确认对话框
+                    if vm.showConfirmation {
+                        ConfirmationView(
+                            title: vm.confirmationTitle,
+                            message: vm.confirmationMessage,
+                            confirmTitle: vm.confirmationTitle.contains("清空") ? "清空" : "退出",
+                            onConfirm: {
+                                vm.confirmationAction?()
+                                vm.dismissDialog()
+                            },
+                            onCancel: { vm.dismissDialog() }
+                        )
+                        .padding(.top, max(24, vm.closedHubSize.height))
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.95)),
+                            removal: .opacity.combined(with: .scale(scale: 0.95))
+                        ))
+                    }
                 }
-                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: vm.showSettings)
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: vm.showSettings || vm.showConfirmation)
             } else {
                 IdleContentView(itemCount: items.count)
                     .frame(width: vm.closedHubSize.width, height: vm.closedHubSize.height)
@@ -224,8 +243,21 @@ struct HubView: View {
     private func handleHover(_ hovering: Bool) {
         isHovering = hovering
         if hovering && vm.hubState == .closed { vm.open() }
-        if !hovering && vm.hubState == .open && items.isEmpty && !vm.isShowingAlert { 
-            vm.close() 
+        if !hovering && vm.hubState == .open && !vm.isShowingAlert {
+            // 延迟处理，给用户时间移回窗口
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if !self.isHovering {
+                    // 先关闭设置或确认弹窗（如果有）
+                    if self.vm.showSettings {
+                        self.vm.showSettings = false
+                    }
+                    if self.vm.showConfirmation {
+                        self.vm.dismissDialog()
+                    }
+                    // 然后直接关闭 hub
+                    self.vm.close()
+                }
+            }
         }
     }
     
@@ -243,6 +275,9 @@ struct HubView: View {
         HubLogger.drag("handleDrop started")
         isProcessingDrop = true // 开启锁定
         
+        // 预加载所有已存在的路径，避免对每个文件单独查询
+        let existingPaths = Set(items.map { $0.originalPath })
+        
         let group = DispatchGroup()
         var addedCount = 0
         for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
@@ -251,8 +286,11 @@ struct HubView: View {
                 defer { group.leave() }
                 if let url = item as? URL ?? (item as? Data).flatMap({ URL(dataRepresentation: $0, relativeTo: nil) }) {
                     DispatchQueue.main.async {
-                        self.addItem(name: url.lastPathComponent, path: url.path)
-                        addedCount += 1
+                        // 使用内存中的 Set 进行查重，避免频繁的 Core Data 查询
+                        if !existingPaths.contains(url.path) {
+                            self.addItem(name: url.lastPathComponent, path: url.path)
+                            addedCount += 1
+                        }
                     }
                 }
             }
@@ -294,7 +332,7 @@ struct HubView: View {
     private func addItem(name: String, path: String) {
         let descriptor = FetchDescriptor<StashedItem>(predicate: #Predicate { $0.originalPath == path })
         if (try? modelContext.fetch(descriptor).isEmpty) ?? true {
-            modelContext.insert(StashedItem(name: name, fileType: StashedItem.inferFileType(from: name), originalPath: path))
+            modelContext.insert(StashedItem(name: name, fileType: StashedItem.inferFileType(from: name, path: path), originalPath: path))
         }
     }
 

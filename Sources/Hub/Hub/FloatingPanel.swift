@@ -2,33 +2,16 @@
 //  FloatingPanel.swift
 //  Hub
 //
-//  Created by 邱基盛 on 2026/2/13.
-//
 
 import SwiftUI
 import AppKit
+import QuartzCore
 
 /// 自定义 NSPanel，实现无边框、置顶，透明背景
 class FloatingPanel: NSPanel {
-    var onDragStarted: (() -> Void)?
-    var onDragEnded: ((NSPoint) -> Void)?
-    var onDragEntered: (() -> Void)?
-    var onDragExited: (() -> Void)?
     
-    private var initialMouseLocation: NSPoint = .zero
-    private var initialWindowOrigin: NSPoint = .zero
-    private var globalMonitor: Any?
-    private var dragDetector: DragDetector?
-    
-    /// 缓存的设置实例
-    private var cachedSettings: HubSettings?
-    
-    var settings: HubSettings {
-        if cachedSettings == nil { cachedSettings = HubSettings() }
-        return cachedSettings!
-    }
-    
-    func refreshSettings() { cachedSettings = nil }
+    /// 防止约束更新循环的标志
+    private var isUpdatingFrame = false
     
     init(contentRect: NSRect, backing: NSWindow.BackingStoreType, defer flag: Bool) {
         super.init(contentRect: contentRect, styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless], backing: backing, defer: flag)
@@ -45,101 +28,109 @@ class FloatingPanel: NSPanel {
         self.titlebarAppearsTransparent = true
         self.acceptsMouseMovedEvents = true
         self.isReleasedWhenClosed = false
+        
+        // 禁用自动约束系统，防止与 SwiftUI 冲突
+        self.contentView?.translatesAutoresizingMaskIntoConstraints = true
+        self.contentView?.autoresizingMask = [.width, .height]
     }
     
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+    
+    /// 重写 setFrame
+    override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        super.setFrame(frameRect, display: flag)
+    }
+    
+    /// 重写 setFrame 带动画版本
+    override func setFrame(_ frameRect: NSRect, display flag: Bool, animate: Bool) {
+        super.setFrame(frameRect, display: flag, animate: animate)
+    }
+    
+    /// 重写 contentView setter 确保禁用约束
+    override var contentView: NSView? {
+        get { super.contentView }
+        set {
+            super.contentView = newValue
+            newValue?.translatesAutoresizingMaskIntoConstraints = true
+            newValue?.autoresizingMask = [.width, .height]
+        }
+    }
+    
+}
 
-    // MARK: - Global Click Monitor
+/// 自定义 HostingView 以确保接受第一响应，并追踪鼠标进入/离开
+class HubHostingView<Content: View>: NSHostingView<Content> {
     
-    func startGlobalClickMonitor() {
-        stopGlobalClickMonitor()
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            guard let self = self else { return }
-            if !self.frame.contains(NSEvent.mouseLocation) {
-                NotificationCenter.default.post(name: .hubClickOutside, object: nil)
-            }
+    /// 鼠标进入回调
+    var onMouseEntered: (() -> Void)?
+    /// 鼠标离开回调
+    var onMouseExited: (() -> Void)?
+    
+    private var trackingArea: NSTrackingArea?
+    
+    required init(rootView: Content) {
+        super.init(rootView: rootView)
+        // 禁用自动约束，防止与 SwiftUI 布局系统冲突
+        self.translatesAutoresizingMaskIntoConstraints = true
+        self.autoresizingMask = [.width, .height]
+        setupTrackingArea()
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        super.init(coder: aDecoder)
+        self.translatesAutoresizingMaskIntoConstraints = true
+        self.autoresizingMask = [.width, .height]
+        setupTrackingArea()
+    }
+    
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        return true
+    }
+    
+    /// 重写 layout 方法，禁用约束更新
+    override func layout() {
+        super.layout()
+        // 确保子视图不使用约束
+        subviews.forEach { view in
+            view.translatesAutoresizingMaskIntoConstraints = true
         }
     }
     
-    func stopGlobalClickMonitor() {
-        if let monitor = globalMonitor {
-            NSEvent.removeMonitor(monitor)
-            globalMonitor = nil
+    private func setupTrackingArea() {
+        // 移除旧的追踪区域
+        if let oldTrackingArea = trackingArea {
+            removeTrackingArea(oldTrackingArea)
+        }
+        
+        // 创建新的追踪区域
+        let options: NSTrackingArea.Options = [
+            .mouseEnteredAndExited,
+            .activeAlways,
+            .inVisibleRect
+        ]
+        trackingArea = NSTrackingArea(rect: .zero, options: options, owner: self, userInfo: nil)
+        
+        if let trackingArea = trackingArea {
+            addTrackingArea(trackingArea)
         }
     }
     
-    deinit {
-        stopGlobalClickMonitor()
-        stopDragDetector()
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        setupTrackingArea()
     }
     
-    // MARK: - Drag Detection
-    
-    func startDragDetector() {
-        stopDragDetector()
-        dragDetector = DragDetector(hubRegion: calculateDragRegion())
-        dragDetector?.onDragEntersHubRegion = { [weak self] in
-            DispatchQueue.main.async { NotificationCenter.default.post(name: .hubDragEntered, object: nil) }
-        }
-        dragDetector?.onDragExitsHubRegion = { [weak self] in
-            DispatchQueue.main.async { NotificationCenter.default.post(name: .hubDragExited, object: nil) }
-        }
-        dragDetector?.startMonitoring()
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        HubLogger.log("🖱️ HubHostingView mouseEntered")
+        onMouseEntered?()
     }
     
-    func stopDragDetector() {
-        dragDetector?.stopMonitoring()
-        dragDetector = nil
-    }
-    
-    private func calculateDragRegion() -> CGRect {
-        return CGRect(
-            x: frame.origin.x,
-            y: frame.origin.y - 100,
-            width: frame.width,
-            height: frame.height + 100
-        )
-    }
-
-    func updateDragRegion() {
-        dragDetector?.updateRegion(calculateDragRegion())
-    }
-    
-    override func setFrame(_ frameRect: NSRect, display displayFlag: Bool) {
-        super.setFrame(frameRect, display: displayFlag)
-        updateDragRegion()
-    }
-
-    override func setFrame(_ frameRect: NSRect, display displayFlag: Bool, animate animateFlag: Bool) {
-        super.setFrame(frameRect, display: displayFlag, animate: animateFlag)
-        updateDragRegion()
-    }
-
-    // MARK: - Mouse Interaction
-    
-    override func mouseDown(with event: NSEvent) {
-        if settings.mode == .floating {
-            initialMouseLocation = NSEvent.mouseLocation
-            initialWindowOrigin = self.frame.origin
-            onDragStarted?()
-        }
-        super.mouseDown(with: event)
-    }
-    
-    override func mouseDragged(with event: NSEvent) {
-        if settings.mode == .floating {
-            let currentMouseLocation = NSEvent.mouseLocation
-            let deltaX = currentMouseLocation.x - initialMouseLocation.x
-            let deltaY = currentMouseLocation.y - initialMouseLocation.y
-            self.setFrameOrigin(NSPoint(x: initialWindowOrigin.x + deltaX, y: initialWindowOrigin.y + deltaY))
-        }
-        super.mouseDragged(with: event)
-    }
-    
-    override func mouseUp(with event: NSEvent) {
-        if settings.mode == .floating { onDragEnded?(self.frame.origin) }
-        super.mouseUp(with: event)
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        HubLogger.log("🖱️ HubHostingView mouseExited")
+        onMouseExited?()
     }
 }
 
@@ -151,97 +142,197 @@ extension Notification.Name {
     static let hubApplySettings = Notification.Name("hubApplySettings")
     static let hubDragEntered = Notification.Name("hubDragEntered")
     static let hubDragExited = Notification.Name("hubDragExited")
+    static let hubDragStateChanged = Notification.Name("hubDragStateChanged")
+    static let hubShowDragOverlay = Notification.Name("hubShowDragOverlay")
     static let hubModeChanged = Notification.Name("hubModeChanged")
     static let hubPositionChanged = Notification.Name("hubPositionChanged")
+    static let hubOrbTapped = Notification.Name("hubOrbTapped")
+    static let hubExpandMenu = Notification.Name("hubExpandMenu")
+    static let hubCollapseMenu = Notification.Name("hubCollapseMenu")
+    static let hubMouseEntered = Notification.Name("hubMouseEntered")
+    static let hubMouseExited = Notification.Name("hubMouseExited")
 }
-
-// MARK: - Window Manager
 
 @MainActor
 class WindowManager {
     static let shared = WindowManager()
     var panel: FloatingPanel?
     
-    private init() {}
-    
     func setupWindow(view: some View) {
         NotificationCenter.default.removeObserver(self)
+        
         let settings = HubSettings()
         let rect = calculateRect(for: settings)
 
         panel = FloatingPanel(contentRect: rect, backing: .buffered, defer: false)
         guard let panel = panel else { return }
         
-        panel.onDragEnded = { [weak self] origin in self?.saveFloatingPosition(origin) }
+        // 使用 CATransaction 禁用隐式动画，避免约束冲突
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         
-        // P0 修复：使用自定义 HostingView 处理 hitTest
         let hostingView = HubHostingView(rootView: view.edgesIgnoringSafeArea(.all))
+        hostingView.frame = NSRect(origin: .zero, size: rect.size)
         panel.contentView = hostingView
         
-        panel.minSize = NSSize(width: HubMetrics.windowSize.width, height: HubMetrics.windowSize.height)
-        panel.startGlobalClickMonitor()
+        CATransaction.commit()
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { panel.startDragDetector() }
         panel.makeKeyAndOrderFront(nil)
         
         NotificationCenter.default.addObserver(self, selector: #selector(handleModeChange(_:)), name: .hubModeChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handlePositionChange(_:)), name: .hubPositionChanged, object: nil)
     }
     
+    /// 关闭窗口
+    func closeWindow() {
+        panel?.close()
+        panel = nil
+        HubLogger.log("刘海模式窗口已关闭")
+    }
+    
+    // MARK: - 悬浮球模式配置
+    
+    /// 悬浮球模式初始窗口大小（收起状态，只包裹悬浮球）
+    private let floatingWindowSize: CGFloat = 84  // 52px球 + 16px*2边距
+    
     private func calculateRect(for settings: HubSettings) -> NSRect {
-        guard let screen = NSScreen.main else {
-            return NSRect(x: 600, y: 900, width: HubMetrics.windowSize.width, height: HubMetrics.windowSize.height)
+        // 使用系统设置中配置的主显示屏（带菜单栏的屏幕）
+        guard let screen = ScreenManager.shared.getMainScreen() else {
+            return NSRect(x: 100, y: 100, width: floatingWindowSize, height: floatingWindowSize)
         }
-        let screenFrame = screen.frame
-        let fullWidth = HubMetrics.windowSize.width
-        let fullHeight = HubMetrics.windowSize.height
-        let contentWidth = HubMetrics.openHubSize.width
         
-        switch settings.mode {
-        case .dynamicIsland:
-            let y = screenFrame.maxY - fullHeight
-            let x = screenFrame.origin.x + (screenFrame.width - contentWidth) / 2 - HubMetrics.sidePadding
-            return NSRect(x: x, y: y, width: fullWidth, height: fullHeight)
-        case .floating:
-            var x = settings.floatingX, y = settings.floatingY
+        if settings.mode == .dynamicIsland {
+            let hubSize = HubMetrics.windowSize
+            let contentWidth = HubMetrics.openHubSize.width
+            let x = screen.frame.origin.x + (screen.frame.width - contentWidth) / 2 - HubMetrics.sidePadding
+            let y = screen.frame.maxY - hubSize.height
+            return NSRect(x: x, y: y, width: hubSize.width, height: hubSize.height)
+        } else {
+            // 悬浮球模式：使用固定大窗口，只定位窗口位置
+            let visibleFrame = screen.visibleFrame
+            
+            var x = settings.floatingX
+            var y = settings.floatingY
+            
+            // 首次启动，默认右下角
             if x == 0 && y == 0 {
-                x = screenFrame.origin.x + screenFrame.width - contentWidth - 100 - HubMetrics.sidePadding
-                y = screenFrame.origin.y + screenFrame.height / 2
+                // 窗口定位在右下角，悬浮球居中显示
+                x = visibleFrame.maxX - floatingWindowSize - 20
+                y = visibleFrame.minY + 20
+                
+                var s = settings
+                s.floatingX = x
+                s.floatingY = y
+                s.save()
             }
-            return NSRect(x: x, y: y, width: fullWidth, height: fullHeight)
+            
+            // 确保窗口在屏幕范围内
+            x = max(visibleFrame.minX, min(x, visibleFrame.maxX - floatingWindowSize))
+            y = max(visibleFrame.minY, min(y, visibleFrame.maxY - floatingWindowSize))
+            
+            return NSRect(x: x, y: y, width: floatingWindowSize, height: floatingWindowSize)
         }
     }
     
-    private func saveFloatingPosition(_ origin: NSPoint) {
-        var settings = HubSettings()
-        settings.floatingX = origin.x; settings.floatingY = origin.y; settings.save()
+    /// 更新悬浮球位置（实时拖拽）
+    func updateFloatingPosition(x: CGFloat, y: CGFloat) {
+        guard HubSettings().mode == .floating,
+              let panel = panel else { return }
+        
+        let visibleFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        
+        // 限制在屏幕范围内
+        let newX = max(visibleFrame.minX, min(x, visibleFrame.maxX - floatingWindowSize))
+        let newY = max(visibleFrame.minY, min(y, visibleFrame.maxY - floatingWindowSize))
+        
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        panel.setFrameOrigin(NSPoint(x: newX, y: newY))
+        CATransaction.commit()
     }
     
     @objc func handleModeChange(_ notification: Notification) {
-        guard let mode = notification.userInfo?["mode"] as? HubMode else { return }
-        var settings = HubSettings(); settings.mode = mode; settings.save()
-        panel?.setFrame(calculateRect(for: settings), display: true, animate: false)
-        NotificationCenter.default.post(name: .hubApplySettings, object: nil, userInfo: ["mode": mode])
+        let settings = HubSettings()
+        
+        if settings.mode == .floating {
+            // 悬浮球模式：保持当前窗口大小，只更新位置
+            guard let panel = panel else { return }
+            let currentFrame = panel.frame
+            let newOrigin = calculateFloatingOrigin(for: settings)
+            
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(0.3)
+            panel.setFrameOrigin(newOrigin)
+            CATransaction.commit()
+        } else {
+            // 刘海模式：重新计算整个窗口
+            let newRect = calculateRect(for: settings)
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(0.3)
+            panel?.setFrame(newRect, display: true, animate: true)
+            CATransaction.commit()
+        }
     }
     
     @objc func handlePositionChange(_ notification: Notification) {
-        if HubSettings().mode == .floating {
-            panel?.setFrame(calculateRect(for: HubSettings()), display: true)
+        let settings = HubSettings()
+        
+        if settings.mode == .floating {
+            // 悬浮球模式：只更新位置
+            let newOrigin = calculateFloatingOrigin(for: settings)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            panel?.setFrameOrigin(newOrigin)
+            CATransaction.commit()
+        } else {
+            // 刘海模式
+            let newRect = calculateRect(for: settings)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            panel?.setFrame(newRect, display: true)
+            CATransaction.commit()
         }
     }
-}
-
-/// P0 修复：自定义 HostingView，仅拦截内容区域的点击
-class HubHostingView<Content: View>: NSHostingView<Content> {
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        // 计算内容区域的有效 Rect
-        let contentRect = NSRect(
-            x: HubMetrics.sidePadding,
-            y: HubMetrics.shadowPadding,
-            width: HubMetrics.openHubSize.width,
-            height: HubMetrics.openHubSize.height
-        )
-        // 只有在内容区域内的点击才由窗口处理
-        return contentRect.contains(point) ? super.hitTest(point) : nil
-    }
+    
+        /// 计算悬浮球模式的窗口原点
+    
+        private func calculateFloatingOrigin(for settings: HubSettings) -> NSPoint {
+    
+            guard let screen = NSScreen.main else { return NSPoint(x: settings.floatingX, y: settings.floatingY) }
+    
+            
+    
+            let visibleFrame = screen.visibleFrame
+    
+            var x = settings.floatingX
+    
+            var y = settings.floatingY
+    
+            
+    
+            // 首次启动，默认右下角
+    
+            if x == 0 && y == 0 {
+    
+                x = visibleFrame.maxX - floatingWindowSize - 20
+    
+                y = visibleFrame.minY + 20
+    
+            }
+    
+            
+    
+            // 宽松边界，允许部分超出
+    
+            let padding: CGFloat = 50
+    
+            x = max(visibleFrame.minX - padding, min(x, visibleFrame.maxX - floatingWindowSize + padding))
+    
+            y = max(visibleFrame.minY - padding, min(y, visibleFrame.maxY - floatingWindowSize + padding))
+    
+            
+    
+            return NSPoint(x: x, y: y)
+    
+        }
 }

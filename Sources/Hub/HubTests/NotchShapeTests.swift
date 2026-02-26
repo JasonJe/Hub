@@ -134,8 +134,8 @@ struct NotchShapeTests {
     @Test
     func testOpenedCornerRadiusConfiguration() {
         // 展开状态的圆角配置
-        let openedTop = cornerRadiusInsets.opened.top
-        let openedBottom = cornerRadiusInsets.opened.bottom
+        let openedTop = HubMetrics.cornerRadiusInsets.opened.top
+        let openedBottom = HubMetrics.cornerRadiusInsets.opened.bottom
         
         #expect(openedTop == 4)
         #expect(openedBottom == 32)
@@ -144,8 +144,8 @@ struct NotchShapeTests {
     @Test
     func testClosedCornerRadiusConfiguration() {
         // 闭合状态的圆角配置
-        let closedTop = cornerRadiusInsets.closed.top
-        let closedBottom = cornerRadiusInsets.closed.bottom
+        let closedTop = HubMetrics.cornerRadiusInsets.closed.top
+        let closedBottom = HubMetrics.cornerRadiusInsets.closed.bottom
         
         #expect(closedTop == 0)
         #expect(closedBottom == 24)
@@ -154,8 +154,8 @@ struct NotchShapeTests {
     @Test
     func testOpenedTopCornerSmallerThanBottom() {
         // 展开状态：顶部圆角应小于底部
-        let openedTop = cornerRadiusInsets.opened.top
-        let openedBottom = cornerRadiusInsets.opened.bottom
+        let openedTop = HubMetrics.cornerRadiusInsets.opened.top
+        let openedBottom = HubMetrics.cornerRadiusInsets.opened.bottom
         
         #expect(openedTop < openedBottom)
     }
@@ -163,7 +163,7 @@ struct NotchShapeTests {
     @Test
     func testClosedTopCornerIsZero() {
         // 闭合状态：顶部圆角应为 0（贴合刘海）
-        let closedTop = cornerRadiusInsets.closed.top
+        let closedTop = HubMetrics.cornerRadiusInsets.closed.top
         
         #expect(closedTop == 0)
     }
