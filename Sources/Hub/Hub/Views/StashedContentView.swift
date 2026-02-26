@@ -91,23 +91,19 @@ struct StashedContentView: View {
                 Button(action: {
                     onShowDialog(.clearAll)
                 }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 9))
-                        Text("清空")
-                    }
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.red)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                Capsule()
-                                    .stroke(.red.opacity(0.2), lineWidth: 0.5)
-                            )
-                    )
+                    Text("清空")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.red)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    Capsule()
+                                        .stroke(.red.opacity(0.2), lineWidth: 0.5)
+                                )
+                        )
                 }
                 .buttonStyle(.plain)
             }
@@ -229,13 +225,9 @@ struct StashedContentView: View {
             Button(action: {
                 onShowDialog(.exit)
             }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "power")
-                        .font(.system(size: 10))
-                    Text("退出")
-                }
-                .font(.system(size: 10))
-                .foregroundColor(.red)
+                Text("退出")
+                    .font(.system(size: 10))
+                    .foregroundColor(.red)
             }
             .buttonStyle(.plain)
         }

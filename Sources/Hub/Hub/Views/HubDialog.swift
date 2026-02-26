@@ -2,7 +2,7 @@
 //  HubDialog.swift
 //  Hub
 //
-//  珠宝级重塑：极致精细的液态玻璃对话框
+//  精致紧凑的确认弹窗 - 与Hub协调一致
 //
 
 import SwiftUI
@@ -15,107 +15,96 @@ struct HubDialog: View {
     let onConfirm: () -> Void
     let onCancel: () -> Void
     
+    @State private var isAppearing: Bool = false
+    
     var body: some View {
         ZStack {
-            // 背景暗化，增加沉浸感
-            Color.black.opacity(0.12)
+            // 半透明遮罩 - 淡入效果
+            Color.black
+                .opacity(isAppearing ? 0.35 : 0)
                 .ignoresSafeArea()
                 .onTapGesture { onCancel() }
             
-            // 弹窗主体
-            VStack(spacing: 0) {
-                // 内容区
+            // 弹窗内容
+            VStack(spacing: 16) {
+                // 标题和描述 - 紧凑布局
                 VStack(spacing: 6) {
                     Text(title)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.primary.opacity(0.9))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.primary)
                     
                     Text(message)
-                        .font(.system(size: 9.5))
-                        .foregroundColor(.secondary.opacity(0.8))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                        .lineSpacing(2)
-                        .padding(.horizontal, 16)
+                        .lineLimit(2)
                 }
-                .padding(.top, 20)
-                .padding(.bottom, 16)
                 
-                // 极细光影分割线
+                // 分割线
                 Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.clear, .white.opacity(0.15), .clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .fill(Color.white.opacity(0.1))
                     .frame(height: 0.5)
                 
-                // 按钮组
-                HStack(spacing: 0) {
+                // 按钮组 - 水平排列更紧凑
+                HStack(spacing: 8) {
+                    // 取消按钮
                     Button(action: onCancel) {
                         Text("取消")
-                            .font(.system(size: 11.5, weight: .medium))
-                            .foregroundColor(.primary.opacity(0.6))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .contentShape(Rectangle())
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                     }
                     .buttonStyle(.plain)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white.opacity(0.08))
+                    )
                     
-                    // 垂直分割线
-                    Rectangle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 0.5, height: 24)
-                    
+                    // 确认按钮
                     Button(action: onConfirm) {
                         Text(confirmTitle)
-                            .font(.system(size: 11.5, weight: .bold))
-                            .foregroundColor(confirmColor.opacity(0.9))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .contentShape(Rectangle())
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                     }
                     .buttonStyle(.plain)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(confirmColor)
+                    )
                 }
-                .frame(height: 36)
             }
-            .frame(width: 180) // 极致宽度
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+            .frame(width: 240)
             .background(
-                ZStack {
-                    // 1. 极致通透材质
-                    RoundedRectangle(cornerRadius: 18).fill(.ultraThinMaterial)
-                    
-                    // 2. 内置液态蓝光与次表面深度
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(
-                            RadialGradient(
-                                colors: [Color.blue.opacity(0.1), Color.cyan.opacity(0.05), .clear],
-                                center: .topLeading,
-                                startRadius: 0,
-                                endRadius: 150
-                            )
-                        )
-                }
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                    )
             )
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            // 3. 双层折射与镜面高光
-            .overlay(
-                ZStack {
-                    // 基础边缘折射
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(
-                            LinearGradient(colors: [.white.opacity(0.3), .white.opacity(0.1)], startPoint: .top, endPoint: .bottom),
-                            lineWidth: 1.2
-                        )
-                    // 极锐利镜面高光 (Specular)
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(
-                            LinearGradient(colors: [.white.opacity(0.8), .clear, .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
-                            lineWidth: 0.5
-                        )
-                }
+            .shadow(
+                color: .black.opacity(0.25),
+                radius: 20,
+                x: 0,
+                y: 10
             )
-            .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 8)
+            // 手风琴动画 - 从底部弹起
+            .offset(y: isAppearing ? 0 : 60)
+            .scaleEffect(isAppearing ? 1.0 : 0.9, anchor: .bottom)
+            .opacity(isAppearing ? 1.0 : 0)
         }
-        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        .onAppear {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                isAppearing = true
+            }
+        }
+        .onDisappear {
+            isAppearing = false
+        }
     }
 }
