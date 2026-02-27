@@ -18,7 +18,7 @@ enum HubMetrics {
     static let sidePadding: CGFloat = 60
 
     /// Hub 展开时的核心尺寸
-    static let openHubSize: CGSize = .init(width: 360, height: 220)
+    static let openHubSize: CGSize = .init(width: 360, height: 260)
 
     /// 窗口总尺寸 (包含内容 + 阴影缓冲区)
     static var windowSize: CGSize {
@@ -35,6 +35,31 @@ enum HubMetrics {
         opened: (top: 16, bottom: 28),
         closed: (top: 0, bottom: 20)
     )
+
+    // MARK: - 悬浮球尺寸
+    
+    /// 悬浮球视觉半径（球体本身的半径）
+    static let orbVisualRadius: CGFloat = 18
+    
+    /// 悬浮球视觉直径
+    static let orbVisualSize: CGFloat = 36
+    
+    /// 悬浮球窗口尺寸（包含边距）
+    static let orbWindowSize: CGFloat = 61
+
+    // MARK: - 文件项图标尺寸
+    
+    /// 刘海模式文件项图标尺寸
+    static let dynamicIslandItemSize: CGFloat = 52
+    
+    /// 悬浮球模式文件项图标尺寸
+    static let floatingOrbItemSize: CGFloat = 52
+    
+    /// 刘海模式文件项总高度（图标 + 文字）
+    static let dynamicIslandItemHeight: CGFloat = 70
+    
+    /// 悬浮球模式文件项总高度
+    static let floatingOrbItemHeight: CGFloat = 70
 
     // MARK: - 布局微调
     
@@ -66,6 +91,42 @@ enum HubMetrics {
         
         /// 悬停效果
         static let hoverDuration: Double = 0.3
+        
+        /// 悬停动画（快速响应）
+        static let hoverResponse: Double = 0.3
+        static let hoverDamping: Double = 0.7
+        
+        /// 弹出动画（中等速度）
+        static let popoverResponse: Double = 0.35
+        static let popoverDamping: Double = 0.75
+        
+        /// 切换动画（快速）
+        static let toggleResponse: Double = 0.25
+        static let toggleDamping: Double = 0.8
+        
+        /// 对话框动画
+        static let dialogResponse: Double = 0.35
+        static let dialogDamping: Double = 0.85
+        
+        /// 便捷方法：获取悬停动画
+        static func hover() -> SwiftUI.Animation {
+            .spring(response: hoverResponse, dampingFraction: hoverDamping)
+        }
+        
+        /// 便捷方法：获取弹出动画
+        static func popover() -> SwiftUI.Animation {
+            .spring(response: popoverResponse, dampingFraction: popoverDamping)
+        }
+        
+        /// 便捷方法：获取切换动画
+        static func toggle() -> SwiftUI.Animation {
+            .spring(response: toggleResponse, dampingFraction: toggleDamping)
+        }
+        
+        /// 便捷方法：获取对话框动画
+        static func dialog() -> SwiftUI.Animation {
+            .spring(response: dialogResponse, dampingFraction: dialogDamping)
+        }
     }
 
     // MARK: - 内部布局参数 (原 LayoutConstants)
@@ -105,4 +166,97 @@ enum HubMetrics {
 
         return .init(width: max(220, notchWidth + closedHubExtraWidth), height: notchHeight)
     }
+}
+
+// MARK: - 颜色系统
+
+/// Hub 统一颜色系统 - 液态玻璃风格
+enum HubColors {
+    // MARK: - 基础色
+    
+    /// 玻璃基底色 - 蓝色调
+    static let glassBase = Color.blue.opacity(0.05)
+    
+    /// 玻璃强调色 - 青色调
+    static let glassAccent = Color.cyan.opacity(0.02)
+    
+    /// 玻璃渐变
+    static var glassGradient: LinearGradient {
+        LinearGradient(
+            colors: [glassBase, glassAccent],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    // MARK: - 边框色
+    
+    /// 边框亮色
+    static let borderLight = Color.white.opacity(0.4)
+    
+    /// 边框暗色
+    static let borderDim = Color.white.opacity(0.1)
+    
+    /// 边框透明
+    static let borderClear = Color.clear
+    
+    /// 边框微光
+    static let borderSubtle = Color.white.opacity(0.05)
+    
+    /// 边框渐变
+    static var borderGradient: LinearGradient {
+        LinearGradient(
+            colors: [borderLight, borderDim, borderClear, borderSubtle],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    // MARK: - 高光色
+    
+    /// 镜面高光亮
+    static let highlightBright = Color.white.opacity(0.8)
+    
+    /// 镜面高光中
+    static let highlightMedium = Color.white.opacity(0.2)
+    
+    /// 液态高光
+    static let highlightLiquid = Color.white.opacity(0.12)
+    
+    /// 悬停高光
+    static let highlightHover = Color.white.opacity(0.35)
+    
+    // MARK: - 阴影色
+    
+    /// 阴影主色
+    static let shadowPrimary = Color.black.opacity(0.15)
+    
+    /// 阴影次级
+    static let shadowSecondary = Color.black.opacity(0.1)
+    
+    /// 阴影微妙
+    static let shadowSubtle = Color.black.opacity(0.05)
+    
+    // MARK: - 悬浮球专用色
+    
+    /// 悬浮球基底
+    static let orbBase = Color.blue.opacity(0.08)
+    
+    /// 悬浮球强调
+    static let orbAccent = Color.cyan.opacity(0.04)
+    
+    /// 悬浮球底部折射
+    static let orbBottomRefraction = Color.blue.opacity(0.12)
+    
+    /// 悬浮球边框亮
+    static let orbBorderLight = Color.white.opacity(0.5)
+    
+    /// 悬浮球边框暗
+    static let orbBorderDim = Color.white.opacity(0.2)
+    
+    /// 悬浮球阴影
+    static let orbShadowPrimary = Color.black.opacity(0.08)
+    
+    /// 悬浮球阴影微
+    static let orbShadowSubtle = Color.black.opacity(0.12)
 }

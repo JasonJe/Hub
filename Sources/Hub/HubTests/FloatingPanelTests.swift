@@ -6,6 +6,7 @@
 //
 
 import Testing
+import SwiftUI
 import AppKit
 @testable import Hub
 
@@ -175,191 +176,42 @@ struct FloatingPanelTests {
         #expect(panel.styleMask.contains(.borderless))
     }
     
-    // MARK: - Callback Tests
+    // MARK: - HubHostingView Tests
     
+    @MainActor
     @Test
-    func testOnDragStartedCallback() {
+    func testHubHostingViewCreation() {
+        let contentRect = NSRect(x: 0, y: 0, width: 300, height: 200)
         let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
+            contentRect: contentRect,
             backing: .buffered,
             defer: false
         )
         
-        var callbackCalled = false
-        panel.onDragStarted = {
-            callbackCalled = true
+        let hostingView = HubHostingView(rootView: Text("Test"))
+        hostingView.frame = NSRect(origin: .zero, size: contentRect.size)
+        panel.contentView = hostingView
+        
+        #expect(panel.contentView === hostingView)
+    }
+    
+    @MainActor
+    @Test
+    func testHubHostingViewMouseCallbacks() {
+        let hostingView = HubHostingView(rootView: Text("Test"))
+        
+        var enteredCalled = false
+        var exitedCalled = false
+        
+        hostingView.onMouseEntered = {
+            enteredCalled = true
+        }
+        hostingView.onMouseExited = {
+            exitedCalled = true
         }
         
-        #expect(panel.onDragStarted != nil)
-    }
-    
-    @Test
-    func testOnDragEndedCallback() {
-        let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
-            backing: .buffered,
-            defer: false
-        )
-        
-        var lastOrigin: NSPoint = .zero
-        panel.onDragEnded = { origin in
-            lastOrigin = origin
-        }
-        
-        #expect(panel.onDragEnded != nil)
-    }
-    
-    @Test
-    func testOnDragEnteredCallback() {
-        let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
-            backing: .buffered,
-            defer: false
-        )
-        
-        var callbackCalled = false
-        panel.onDragEntered = {
-            callbackCalled = true
-        }
-        
-        #expect(panel.onDragEntered != nil)
-    }
-    
-    @Test
-    func testOnDragExitedCallback() {
-        let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
-            backing: .buffered,
-            defer: false
-        )
-        
-        var callbackCalled = false
-        panel.onDragExited = {
-            callbackCalled = true
-        }
-        
-        #expect(panel.onDragExited != nil)
-    }
-    
-    // MARK: - Global Click Monitor Tests
-    
-    @Test
-    func testStartGlobalClickMonitorDoesNotCrash() {
-        let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
-            backing: .buffered,
-            defer: false
-        )
-        
-        panel.startGlobalClickMonitor()
-        panel.stopGlobalClickMonitor()
-        
-        #expect(true)
-    }
-    
-    @Test
-    func testStopGlobalClickMonitorDoesNotCrash() {
-        let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
-            backing: .buffered,
-            defer: false
-        )
-        
-        // 停止未启动的监控不应该崩溃
-        panel.stopGlobalClickMonitor()
-        
-        #expect(true)
-    }
-    
-    @Test
-    func testStartStopGlobalClickMonitorCycle() {
-        let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
-            backing: .buffered,
-            defer: false
-        )
-        
-        panel.startGlobalClickMonitor()
-        panel.stopGlobalClickMonitor()
-        panel.startGlobalClickMonitor()
-        panel.stopGlobalClickMonitor()
-        
-        #expect(true)
-    }
-    
-    // MARK: - Drag Detector Tests
-    
-    @Test
-    func testStartDragDetectorDoesNotCrash() {
-        let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
-            backing: .buffered,
-            defer: false
-        )
-        
-        panel.startDragDetector()
-        panel.stopDragDetector()
-        
-        #expect(true)
-    }
-    
-    @Test
-    func testStopDragDetectorDoesNotCrash() {
-        let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
-            backing: .buffered,
-            defer: false
-        )
-        
-        // 停止未启动的检测器不应该崩溃
-        panel.stopDragDetector()
-        
-        #expect(true)
-    }
-    
-    @Test
-    func testUpdateDragRegionDoesNotCrash() {
-        let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
-            backing: .buffered,
-            defer: false
-        )
-        
-        panel.startDragDetector()
-        panel.updateDragRegion()
-        panel.stopDragDetector()
-        
-        #expect(true)
-    }
-    
-    // MARK: - Integration Tests
-    
-    @Test
-    func testFullPanelLifecycle() {
-        let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 240),
-            backing: .buffered,
-            defer: false
-        )
-        
-        // 设置回调
-        panel.onDragStarted = { }
-        panel.onDragEnded = { _ in }
-        panel.onDragEntered = { }
-        panel.onDragExited = { }
-        
-        // 启动监控
-        panel.startGlobalClickMonitor()
-        panel.startDragDetector()
-        
-        // 更新区域
-        panel.updateDragRegion()
-        
-        // 停止监控
-        panel.stopGlobalClickMonitor()
-        panel.stopDragDetector()
-        
-        #expect(true)
+        #expect(hostingView.onMouseEntered != nil)
+        #expect(hostingView.onMouseExited != nil)
     }
     
     // MARK: - Window Level Tests
@@ -374,5 +226,63 @@ struct FloatingPanelTests {
         
         // panel.level = .mainMenu + 3
         #expect(panel.level.rawValue > NSWindow.Level.mainMenu.rawValue)
+    }
+    
+    // MARK: - Frame Animation Tests
+    
+    @MainActor
+    @Test
+    func testSetFrameWithAnimation() {
+        let panel = FloatingPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
+            backing: .buffered,
+            defer: false
+        )
+        
+        let newFrame = NSRect(x: 100, y: 100, width: 400, height: 300)
+        
+        // setFrame with animate should not crash
+        panel.setFrame(newFrame, display: true, animate: true)
+        
+        // Frame should be updated
+        #expect(panel.frame == newFrame)
+    }
+    
+    @MainActor
+    @Test
+    func testSetFrameWithoutAnimation() {
+        let panel = FloatingPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
+            backing: .buffered,
+            defer: false
+        )
+        
+        let newFrame = NSRect(x: 50, y: 50, width: 350, height: 250)
+        
+        // setFrame without animate should not crash
+        panel.setFrame(newFrame, display: true, animate: false)
+        
+        // Frame should be updated
+        #expect(panel.frame == newFrame)
+    }
+    
+    // MARK: - Content View Autoresizing Tests
+    
+    @MainActor
+    @Test
+    func testContentViewAutoresizingMask() {
+        let panel = FloatingPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
+            backing: .buffered,
+            defer: false
+        )
+        
+        let hostingView = HubHostingView(rootView: Text("Test"))
+        panel.contentView = hostingView
+        
+        // Content view should have autoresizing mask
+        #expect(hostingView.autoresizingMask.contains(.width))
+        #expect(hostingView.autoresizingMask.contains(.height))
+        #expect(hostingView.translatesAutoresizingMaskIntoConstraints == true)
     }
 }

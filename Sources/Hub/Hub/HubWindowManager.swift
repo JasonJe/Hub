@@ -20,9 +20,10 @@ class HubWindowManager: ObservableObject {
     private var hubPanel: FloatingPanel?
     private let autoCloseManager = HubAutoCloseManager.shared
     
-    // Hub 窗口尺寸
-    private let hubWidth: CGFloat = 320
-    private let hubHeight: CGFloat = 360
+    // Hub 窗口尺寸 - 根据图标尺寸动态计算
+    // 4列图标(52*4) + 3个间距(12*3) + 2个padding(16*2) = 208 + 36 + 32 = 276，取整为 280
+    private let hubWidth: CGFloat = 280
+    private let hubHeight: CGFloat = 320
     
     /// 显示 Hub 窗口
     func show(from corner: ScreenCorner, orbFrame: NSRect, modelContainer: ModelContainer?) {
@@ -157,7 +158,7 @@ class HubWindowManager: ObservableObject {
         )
     }
     
-    /// 计算 Hub 窗口位置（悬浮球紧贴 Hub 的角落）
+    /// 计算 Hub 窗口位置（悬浮球外接 Hub 的角落）
     private func calculateHubRect(from corner: ScreenCorner, orbFrame: NSRect) -> NSRect {
         // 找到悬浮球所在的屏幕（使用悬浮球中心点判断）
         guard let screen = findScreenForOrb(orbFrame: orbFrame) ?? ScreenManager.shared.getMainScreen() else {
@@ -170,54 +171,49 @@ class HubWindowManager: ObservableObject {
         HubLogger.log("🔵 悬浮球中心: (\(orbFrame.midX), \(orbFrame.midY))")
         HubLogger.log("🔵 屏幕可见区域: \(visibleFrame)")
         
-        // 悬浮球视觉参数
+        // 悬浮球窗口中心位置
         let orbCenterX = orbFrame.midX
         let orbCenterY = orbFrame.midY
-        // 悬浮球视觉半径（窗口内球体的实际半径）
-        let orbVisualRadius: CGFloat = 18  // 球体 36px / 2
-        // 紧贴间隙（0 表示完全紧贴，负值表示重叠）
-        let gap: CGFloat = -15  // 让悬浮球和 Hub 更多重叠，视觉更紧凑
         
-        // 计算悬浮球视觉边缘位置（考虑间隙）
-        let orbLeftEdge = orbCenterX - orbVisualRadius - gap
-        let orbRightEdge = orbCenterX + orbVisualRadius + gap
-        let orbBottomEdge = orbCenterY - orbVisualRadius - gap
-        let orbTopEdge = orbCenterY + orbVisualRadius + gap
-        
-        HubLogger.log("🔵 悬浮球视觉边缘: 左=\(orbLeftEdge), 右=\(orbRightEdge), 下=\(orbBottomEdge), 上=\(orbTopEdge)")
+        // 悬浮球视觉半径（球体本身的半径）
+        let orbVisualRadius: CGFloat = HubMetrics.orbVisualRadius  // 18
+        // 间隙：悬浮球边缘到 Hub 边缘的距离
+        let gap: CGFloat = 4
         
         var x: CGFloat
         var y: CGFloat
         
         // 根据传入的 corner 参数决定展开方向
-        // 悬浮球贴在 Hub 的对应角落
-        // corner 表示悬浮球相对于 Hub 的位置
+        // 悬浮球在 Hub 的对应角落外侧，紧贴 Hub
         switch corner {
         case .topLeft:
-            // 悬浮球在 Hub 左上角：Hub 向右下展开
-            // Hub 左上角 = 悬浮球右下边缘
-            x = orbRightEdge
-            y = orbBottomEdge - hubHeight
+            // 悬浮球在 Hub 左上角外侧
+            // Hub 左边缘 = 悬浮球右边缘 + 间隙
+            x = orbCenterX + orbVisualRadius + gap
+            // Hub 上边缘 = 悬浮球下边缘 + 间隙
+            y = orbCenterY - orbVisualRadius - gap - hubHeight
         case .topRight:
-            // 悬浮球在 Hub 右上角：Hub 向左下展开
-            // Hub 右上角 = 悬浮球左下边缘
-            x = orbLeftEdge - hubWidth
-            y = orbBottomEdge - hubHeight
+            // 悬浮球在 Hub 右上角外侧
+            // Hub 右边缘 = 悬浮球左边缘 - 间隙
+            x = orbCenterX - orbVisualRadius - gap - hubWidth
+            // Hub 上边缘 = 悬浮球下边缘 + 间隙
+            y = orbCenterY - orbVisualRadius - gap - hubHeight
         case .bottomLeft:
-            // 悬浮球在 Hub 左下角：Hub 向右上展开
-            // Hub 左下角 = 悬浮球右上边缘
-            x = orbRightEdge
-            y = orbTopEdge
+            // 悬浮球在 Hub 左下角外侧
+            // Hub 左边缘 = 悬浮球右边缘 + 间隙
+            x = orbCenterX + orbVisualRadius + gap
+            // Hub 下边缘 = 悬浮球上边缘 - 间隙
+            y = orbCenterY + orbVisualRadius + gap
         case .bottomRight:
-            // 悬浮球在 Hub 右下角：Hub 向左上展开
-            // Hub 右下角 = 悬浮球左上边缘
-            x = orbLeftEdge - hubWidth
-            y = orbTopEdge
+            // 悬浮球在 Hub 右下角外侧
+            // Hub 右边缘 = 悬浮球左边缘 - 间隙
+            x = orbCenterX - orbVisualRadius - gap - hubWidth
+            // Hub 下边缘 = 悬浮球上边缘 - 间隙
+            y = orbCenterY + orbVisualRadius + gap
         }
         
         HubLogger.log("🔵 使用 corner: \(corner)")
         HubLogger.log("🔵 Hub 目标位置: (\(x), \(y))")
-        HubLogger.log("🔵 计算后 Hub 位置: (\(x), \(y))")
         
         // 确保不超出该屏幕的可见区域边界（留出边距）
         let clampedX = max(visibleFrame.minX + 10, min(x, visibleFrame.maxX - hubWidth - 10))
@@ -309,13 +305,19 @@ struct HubContentView: View {
     // 拖拽状态
     @State private var isDragging = false
     @State private var pulseOpacity: CGFloat = 0.3
+    @State private var dragScale: CGFloat = 1.0
+    @State private var dragOpacity: CGFloat = 1.0
     
     // 悬浮球区域大小
     private let orbAreaSize: CGFloat = 84
     
+    // Shimmer 动画状态
+    @State private var shimmerOffset: CGFloat = -1.0
+    @State private var isWindowVisible: Bool = false
+    
     var body: some View {
-        ZStack {
-            // 1. 底层拖放区域 - 全窗口接收拖放
+        ZStack(alignment: .top) {
+            // 1. 拖放接收区 (全透明)
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
@@ -333,43 +335,72 @@ struct HubContentView: View {
                     return true
                 }
             
-            // 2. 主内容层
-            if showConfirmation {
-                ConfirmationView(
-                    title: confirmationTitle,
-                    message: confirmationMessage,
-                    confirmTitle: confirmationTitle.contains("清空") ? "清空" : "退出",
-                    onConfirm: {
-                        confirmationAction?()
-                        dismissConfirmation()
-                    },
-                    onCancel: dismissConfirmation
-                )
-                .padding(.top, 24)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 0.9)),
-                    removal: .opacity.combined(with: .scale(scale: 0.95))
-                ))
-            } else if showSettings {
-                SettingsContentView(onClose: { showSettings = false })
-                    .padding(.top, 24)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .trailing)),
-                        removal: .opacity.combined(with: .move(edge: .trailing))
-                    ))
-            } else {
-                mainContent
-                    .transition(.asymmetric(
-                        insertion: .opacity,
-                        removal: .opacity.combined(with: .scale(scale: 0.98))
-                    ))
+            // 2. 主内容层 - 与刘海模式结构完全一致
+            ZStack(alignment: .top) {
+                // 玻璃容器主体 - 液态玻璃效果应用在这一层
+                hubContentView
+                    .frame(width: 280, height: 320, alignment: .top)
+                    .background(
+                        // 使用 GeometryReader 确保背景填满
+                        GeometryReader { geometry in
+                            ZStack {
+                                // 1. 内部深度：极淡的次表面色彩
+                                RoundedRectangle(cornerRadius: 24)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.blue.opacity(0.05), Color.cyan.opacity(0.02)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                
+                                // 2. 核心材质：极致通透
+                                RoundedRectangle(cornerRadius: 24)
+                                    .fill(.ultraThinMaterial)
+                                
+                                // 3. 表面流光：使用 plusLighter 增强亮度
+                                // 单独提取为子视图以确保动画独立
+                                ShimmerLayer(shimmerOffset: shimmerOffset)
+                                    .frame(width: geometry.size.width, height: geometry.size.height)
+                            }
+                        }
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                    .overlay(
+                        ZStack {
+                            // 4. 基础折射边框
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.4), .white.opacity(0.1), .clear, .white.opacity(0.05)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1.2
+                                )
+                            
+                            // 5. 极锐利镜面高光
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.8), .white.opacity(0.2), .clear],
+                                        startPoint: .topLeading,
+                                        endPoint: UnitPoint(x: 0.3, y: 0.3)
+                                    ),
+                                    lineWidth: 0.5
+                                )
+                        }
+                    )
+                    .contentShape(Rectangle())
+                    .scaleEffect(dragScale)
+                    .opacity(dragOpacity)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             
-            // 3. 拖拽过渡效果 - 在最上层显示
+            // 3. 拖拽提示组件 - 在最上层显示
             if isDragging {
                 FloatingHubDragOverlay(pulseOpacity: pulseOpacity)
+                    .frame(width: 280, height: 320)
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.85)),
                         removal: .opacity.combined(with: .scale(scale: 1.05))
@@ -377,79 +408,22 @@ struct HubContentView: View {
                     .animation(.spring(response: 0.35, dampingFraction: 0.75), value: isDragging)
             }
         }
-        .frame(width: 300, height: 340)
-        .background(
-            ZStack {
-                // 1. 内部深度：极淡的次表面色彩
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.blue.opacity(0.05),
-                                Color.cyan.opacity(0.02)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                
-                // 2. 核心材质：极致通透
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-                
-                // 3. 表面流光
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [.clear, .white.opacity(0.1), .clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .blendMode(.plusLighter)
-            }
-        )
-        .overlay(
-            ZStack {
-                // 4. 基础折射边框
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                .white.opacity(0.4),
-                                .white.opacity(0.1),
-                                .clear,
-                                .white.opacity(0.05)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1.2
-                    )
-                
-                // 5. 极锐利镜面高光
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                .white.opacity(0.6),
-                                .white.opacity(0.1),
-                                .clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: UnitPoint(x: 0.3, y: 0.3)
-                        ),
-                        lineWidth: 0.5
-                    )
-            }
-        )
-        .shadow(color: .black.opacity(0.15), radius: 25, x: 0, y: 12)
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .frame(width: 280, height: 320, alignment: .top)
         .onAppear {
+            // 标记窗口可见
+            isWindowVisible = true
             // 初始化 items
             self.items = queryItems
+            // 重置拖拽状态
+            dragScale = 1.0
+            dragOpacity = 1.0
             HubLogger.log("📂 HubContentView onAppear, items.count = \(items.count)")
+            
+            // 直接启动 shimmer 动画
+            shimmerOffset = -1.0
+            withAnimation(.linear(duration: 5).repeatForever(autoreverses: false)) {
+                shimmerOffset = 1.5
+            }
             
             // 启动安全收起计时器 - 如果鼠标从未进入 Hub，3秒后自动收起
             let safetyWorkItem = DispatchWorkItem { [onClose] in
@@ -518,6 +492,17 @@ struct HubContentView: View {
                 HubLogger.log("🖱️ 收到 mouseExited 通知"); self.handleHover(false)
             }
         }
+        .onChange(of: isWindowVisible) { _, isVisible in
+            HubLogger.log("👁️ isWindowVisible changed: \(isVisible)")
+        }
+        .onChange(of: showSettings) { _, _ in
+            // 使用显式动画处理设置页切换
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {}
+        }
+        .onChange(of: showConfirmation) { _, _ in
+            // 使用显式动画处理确认对话框
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {}
+        }
         .onChange(of: queryItems) { _, newItems in
             HubLogger.log("🔄 queryItems 变化，更新 items: \(newItems.count)")
             self.items = newItems
@@ -526,6 +511,11 @@ struct HubContentView: View {
             if oldValue != newValue {
                 HubLogger.log("🎯 isDragging changed: \(oldValue) -> \(newValue)")
                 handleDraggingChange(newValue)
+                // 使用显式动画处理拖拽缩放和透明度效果
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    dragScale = newValue ? 0.98 : 1.0
+                    dragOpacity = newValue ? 0 : 1
+                }
             }
         }
     }
@@ -563,6 +553,59 @@ struct HubContentView: View {
         } else {
             withAnimation(.easeOut(duration: 0.3)) {
                 pulseOpacity = 0.3
+            }
+        }
+    }
+    
+    /// Shimmer 流光层 - 独立子视图确保动画正确运行
+    private struct ShimmerLayer: View {
+        let shimmerOffset: CGFloat
+        
+        var body: some View {
+            RoundedRectangle(cornerRadius: 24)
+                .fill(
+                    LinearGradient(
+                        colors: [.clear, .white.opacity(0.15), .clear],
+                        startPoint: UnitPoint(x: shimmerOffset, y: 0),
+                        endPoint: UnitPoint(x: shimmerOffset + 0.3, y: 1)
+                    )
+                )
+                .blendMode(.plusLighter)
+        }
+    }
+    
+    /// Hub 内容视图 - 与刘海模式的 hubLayoutContent 对应
+    private var hubContentView: some View {
+        ZStack {
+            // 主内容
+            mainContent
+                .opacity(showSettings || showConfirmation ? 0 : 1)
+                .offset(x: showSettings ? -30 : 0)
+            
+            // 设置页面
+            SettingsContentView(onClose: { showSettings = false })
+                .padding(.top, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(showSettings && !showConfirmation ? 1 : 0)
+                .offset(x: showSettings ? 0 : 30)
+            
+            // 确认对话框
+            if showConfirmation {
+                ConfirmationView(
+                    title: confirmationTitle,
+                    message: confirmationMessage,
+                    confirmTitle: confirmationTitle.contains("清空") ? "清空" : "退出",
+                    onConfirm: {
+                        confirmationAction?()
+                        dismissConfirmation()
+                    },
+                    onCancel: dismissConfirmation
+                )
+                .padding(.top, 24)
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 0.9)),
+                    removal: .opacity.combined(with: .scale(scale: 0.95))
+                ))
             }
         }
     }
@@ -661,17 +704,24 @@ struct HubContentView: View {
                         HubLogger.log("📂 contentArea: items.isEmpty = true, count = \(items.count)")
                     }
             } else {
+                let iconSize = HubMetrics.floatingOrbItemSize
                 ScrollView(showsIndicators: false) {
                     LazyVGrid(
                         columns: [
-                            GridItem(.fixed(64), spacing: 12),
-                            GridItem(.fixed(64), spacing: 12),
-                            GridItem(.fixed(64), spacing: 12)
+                            GridItem(.fixed(iconSize), spacing: 12),
+                            GridItem(.fixed(iconSize), spacing: 12),
+                            GridItem(.fixed(iconSize), spacing: 12),
+                            GridItem(.fixed(iconSize), spacing: 12)
                         ],
                         spacing: 12
                     ) {
                         ForEach(items) { item in
-                            DraggableItemView(item: item, modelContext: modelContext)
+                            DraggableItemView(
+                                item: item,
+                                modelContext: modelContext,
+                                iconSize: iconSize,
+                                itemHeight: HubMetrics.floatingOrbItemHeight
+                            )
                                 .contextMenu {
                                     Button("删除") {
                                         withAnimation {
@@ -681,7 +731,7 @@ struct HubContentView: View {
                                 }
                         }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
                 .onAppear {
@@ -757,8 +807,9 @@ struct HubContentView: View {
         let path = url.path
         if items.contains(where: { $0.originalPath == path }) {
             HubLogger.log("⚠️ 文件已存在，跳过: \(url.lastPathComponent)")
-            // 隐藏拖拽过渡效果
+            // 隐藏拖拽过渡效果，延迟后检查是否关闭
             isDragging = false
+            scheduleAutoCloseAfterDrop()
             return
         }
         
@@ -777,11 +828,34 @@ struct HubContentView: View {
             refreshItems()
             // 隐藏拖拽过渡效果
             isDragging = false
+            // 延迟后检查是否关闭
+            scheduleAutoCloseAfterDrop()
         } catch {
             HubLogger.log("❌ 保存失败: \(error)")
             // 隐藏拖拽过渡效果
             isDragging = false
+            // 延迟后检查是否关闭
+            scheduleAutoCloseAfterDrop()
         }
+    }
+    
+    /// 拖放完成后延迟检查是否关闭
+    private func scheduleAutoCloseAfterDrop() {
+        // 取消之前的关闭操作
+        closeWorkItem?.cancel()
+        
+        // 延迟 2.5 秒后检查是否关闭
+        let workItem = DispatchWorkItem { [onClose, isHovering] in
+            // 只有鼠标不在 Hub 内时才关闭
+            if !isHovering {
+                HubLogger.log("🖱️ 拖放完成延迟关闭：鼠标不在 Hub 内，关闭 Hub")
+                onClose()
+            } else {
+                HubLogger.log("🖱️ 拖放完成延迟关闭：鼠标在 Hub 内，保持展开")
+            }
+        }
+        closeWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: workItem)
     }
     
     private func refreshItems() {
@@ -806,10 +880,10 @@ struct FloatingHubDragOverlay: View {
     var body: some View {
         ZStack {
             // 背景材质 - 更深的背景以确保可见
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 24)
                 .fill(.thinMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 24)
                         .stroke(
                             LinearGradient(
                                 colors: [.blue.opacity(0.5), .cyan.opacity(0.3)],

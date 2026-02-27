@@ -14,13 +14,21 @@ struct HubDragOverlay: View {
     let closedHubHeight: CGFloat
     let currentHubShape: NotchShape
     
+    /// 拖拽时始终使用展开状态的形状
+    private var expandedShape: NotchShape {
+        NotchShape(
+            topCornerRadius: HubMetrics.cornerRadiusInsets.opened.top,
+            bottomCornerRadius: HubMetrics.cornerRadiusInsets.opened.bottom
+        )
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
                 // 1. 双层折射玻璃底座
                 ZStack {
-                    currentHubShape.fill(.ultraThinMaterial)
-                    currentHubShape.fill(
+                    expandedShape.fill(.ultraThinMaterial)
+                    expandedShape.fill(
                         LinearGradient(
                             colors: [.white.opacity(0.12), .clear],
                             startPoint: .top,
@@ -28,10 +36,10 @@ struct HubDragOverlay: View {
                         )
                     )
                 }
-                .clipShape(currentHubShape)
+                .clipShape(expandedShape)
                 .overlay(
                     ZStack {
-                        currentHubShape.stroke(
+                        expandedShape.stroke(
                             LinearGradient(
                                 colors: [.white.opacity(0.3), .white.opacity(0.1)],
                                 startPoint: .top,
@@ -39,7 +47,7 @@ struct HubDragOverlay: View {
                             ),
                             lineWidth: 1.5
                         )
-                        currentHubShape.stroke(
+                        expandedShape.stroke(
                             LinearGradient(
                                 colors: [.white.opacity(0.5), .clear],
                                 startPoint: .topLeading,

@@ -37,14 +37,24 @@ class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
     
-    /// 重写 setFrame
+    /// 重写 setFrame - 禁用隐式动画避免 CATransaction 冲突
     override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         super.setFrame(frameRect, display: flag)
+        CATransaction.commit()
     }
     
     /// 重写 setFrame 带动画版本
     override func setFrame(_ frameRect: NSRect, display flag: Bool, animate: Bool) {
-        super.setFrame(frameRect, display: flag, animate: animate)
+        if animate {
+            super.setFrame(frameRect, display: flag, animate: true)
+        } else {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            super.setFrame(frameRect, display: flag, animate: false)
+            CATransaction.commit()
+        }
     }
     
     /// 重写 contentView setter 确保禁用约束
@@ -153,10 +163,51 @@ extension Notification.Name {
     static let hubMouseExited = Notification.Name("hubMouseExited")
 }
 
+// MARK: - 刘海模式拖拽检测状态
+
+/// 刘海模式拖拽检测状态管理类
+private class DynamicIslandDragState {
+    var mouseDownMonitor: Any?
+    var mouseDraggedMonitor: Any?
+    var mouseUpMonitor: Any?
+    var pasteboardChangeCount: Int = -1
+    var isDragging: Bool = false
+    var isContentDragging: Bool = false
+    let dragPasteboard = NSPasteboard(name: .drag)
+    
+    func cleanup() {
+        [mouseDownMonitor, mouseDraggedMonitor, mouseUpMonitor].forEach { monitor in
+            if let monitor = monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+        }
+        mouseDownMonitor = nil
+        mouseDraggedMonitor = nil
+        mouseUpMonitor = nil
+        isDragging = false
+        isContentDragging = false
+    }
+    
+    deinit {
+        cleanup()
+    }
+}
+
+/// 弱引用包装器 - 用于刘海模式拖拽检测
+private class WeakIslandDragState {
+    weak var value: DynamicIslandDragState?
+    init(value: DynamicIslandDragState?) {
+        self.value = value
+    }
+}
+
 @MainActor
 class WindowManager {
     static let shared = WindowManager()
     var panel: FloatingPanel?
+    
+    /// 刘海模式的全局拖拽检测状态
+    private var dragDetectionState = DynamicIslandDragState()
     
     func setupWindow(view: some View) {
         NotificationCenter.default.removeObserver(self)
@@ -181,13 +232,86 @@ class WindowManager {
         
         NotificationCenter.default.addObserver(self, selector: #selector(handleModeChange(_:)), name: .hubModeChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handlePositionChange(_:)), name: .hubPositionChanged, object: nil)
+        
+        // 延迟启动全局拖拽检测（刘海模式）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.startDragDetection()
+        }
     }
     
     /// 关闭窗口
     func closeWindow() {
+        // 停止全局拖拽检测
+        stopDragDetection()
+        
         panel?.close()
         panel = nil
         HubLogger.log("刘海模式窗口已关闭")
+    }
+    
+    // MARK: - 刘海模式全局拖拽检测
+    
+    /// 开始检测文件拖拽（刘海模式）
+    private func startDragDetection() {
+        dragDetectionState.cleanup()
+        
+        HubLogger.log("🔵 刘海模式：开始监听文件拖拽（全局鼠标事件）")
+        
+        let weakDragState = WeakIslandDragState(value: dragDetectionState)
+        
+        // 鼠标按下 - 记录粘贴板状态
+        dragDetectionState.mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { _ in
+            guard let dragState = weakDragState.value else { return }
+            dragState.pasteboardChangeCount = dragState.dragPasteboard.changeCount
+            dragState.isDragging = true
+            dragState.isContentDragging = false
+        }
+        
+        // 鼠标移动 - 检测是否开始拖拽文件
+        dragDetectionState.mouseDraggedMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged]) { _ in
+            guard let dragState = weakDragState.value, dragState.isDragging else { return }
+            
+            // 检测粘贴板变化，确认是内容拖拽
+            if !dragState.isContentDragging && dragState.dragPasteboard.changeCount != dragState.pasteboardChangeCount {
+                let hasFileURL = dragState.dragPasteboard.types?.contains(.fileURL) == true
+                if hasFileURL {
+                    dragState.isContentDragging = true
+                    HubLogger.log("🔵 刘海模式：检测到文件拖拽，通知展开 Hub")
+                    
+                    DispatchQueue.main.async {
+                        // 通知 HubView 展开并显示拖拽效果
+                        NotificationCenter.default.post(
+                            name: .hubDragEntered,
+                            object: nil
+                        )
+                    }
+                }
+            }
+        }
+        
+        // 鼠标松开 - 拖拽结束
+        dragDetectionState.mouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp]) { _ in
+            guard let dragState = weakDragState.value else { return }
+            if dragState.isContentDragging {
+                HubLogger.log("🔵 刘海模式：文件拖拽结束")
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: .hubDragExited,
+                        object: nil
+                    )
+                }
+            }
+            
+            dragState.isDragging = false
+            dragState.isContentDragging = false
+            dragState.pasteboardChangeCount = -1
+        }
+    }
+    
+    /// 停止拖拽检测
+    private func stopDragDetection() {
+        dragDetectionState.cleanup()
+        HubLogger.log("🔵 刘海模式：停止监听文件拖拽")
     }
     
     // MARK: - 悬浮球模式配置
@@ -257,7 +381,6 @@ class WindowManager {
         if settings.mode == .floating {
             // 悬浮球模式：保持当前窗口大小，只更新位置
             guard let panel = panel else { return }
-            let currentFrame = panel.frame
             let newOrigin = calculateFloatingOrigin(for: settings)
             
             CATransaction.begin()

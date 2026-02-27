@@ -80,11 +80,6 @@ struct HubView: View {
                                     )
                                 )
                                 .blendMode(.plusLighter)
-                                .onAppear {
-                                    withAnimation(.linear(duration: 5).repeatForever(autoreverses: false)) {
-                                        shimmerOffset = 1.5
-                                    }
-                                }
                         }
                     )
                     .clipShape(currentHubShape)
@@ -155,6 +150,17 @@ struct HubView: View {
         }
         .frame(width: HubMetrics.windowSize.width, height: HubMetrics.windowSize.height, alignment: .top)
         .overlay { onboardingOverlay }
+        .onChange(of: vm.hubState) { _, newState in
+            // 只在 Hub 展开时启动 shimmer 动画
+            if newState == .open {
+                withAnimation(.linear(duration: 5).repeatForever(autoreverses: false)) {
+                    shimmerOffset = 1.5
+                }
+            } else {
+                // 关闭时重置
+                shimmerOffset = -1.0
+            }
+        }
         .onAppear(perform: checkAndShowOnboarding)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in checkAndShowOnboarding() }
         .onExitCommand { if vm.hubState == .open { vm.close() } }

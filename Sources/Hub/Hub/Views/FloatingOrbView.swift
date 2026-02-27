@@ -25,6 +25,7 @@ struct FloatingOrbView: View {
     @State private var isHovering = false
     @State private var isDragging = false
     @State private var dragOffset: CGSize = .zero
+    @State private var shimmerOffset: CGFloat = -1.0  // 液态玻璃流光动画
     
     var body: some View {
         GeometryReader { geometry in
@@ -219,30 +220,39 @@ struct FloatingOrbView: View {
         let isExpanded = viewModel.isOrbExpanded || viewModel.showSettings || viewModel.showConfirmation
         
         return ZStack {
-            if viewModel.showSettings {
-                settingsContent
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .trailing).combined(with: .scale(scale: 0.95))),
-                        removal: .opacity.combined(with: .move(edge: .trailing).combined(with: .scale(scale: 0.95)))
-                    ))
-            } else if viewModel.showConfirmation {
-                confirmationContent
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.8)),
-                        removal: .opacity.combined(with: .scale(scale: 0.8))
-                    ))
-            } else {
+            // 主内容和设置页面 - 使用 ZStack 同时显示，动画与刘海模式一致
+            ZStack {
+                // 主菜单内容
                 mainMenuContent
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.9)),
-                        removal: .opacity.combined(with: .scale(scale: 0.95))
-                    ))
+                    .opacity(viewModel.showSettings || viewModel.showConfirmation ? 0 : 1)
+                    .offset(x: viewModel.showSettings ? -30 : 0)
+                
+                // 设置页面
+                settingsContent
+                    .opacity(viewModel.showSettings && !viewModel.showConfirmation ? 1 : 0)
+                    .offset(x: viewModel.showSettings ? 0 : 30)
+                
+                // 确认对话框
+                if viewModel.showConfirmation {
+                    confirmationContent
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.9)),
+                            removal: .opacity.combined(with: .scale(scale: 0.95))
+                        ))
+                }
             }
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.showSettings || viewModel.showConfirmation)
         }
         .position(position)
         .scaleEffect(isExpanded ? 1 : 0.85, anchor: anchor)
         .opacity(isExpanded ? 1 : 0)
         .animation(.spring(response: 0.35, dampingFraction: 0.75, blendDuration: 0.1), value: isExpanded)
+        .onAppear {
+            // 启动 shimmer 动画
+            withAnimation(.linear(duration: 5).repeatForever(autoreverses: false)) {
+                shimmerOffset = 1.5
+            }
+        }
     }
     
     private var mainMenuContent: some View {
@@ -332,59 +342,62 @@ struct FloatingOrbView: View {
         .frame(width: menuWidth, height: menuHeight)
         .background(
             ZStack {
-                // 液态玻璃底层：柔和渐变
+                // 1. 内部深度：极淡的次表面色彩（与刘海模式一致）
                 RoundedRectangle(cornerRadius: 24)
                     .fill(
                         LinearGradient(
-                            colors: [
-                                Color.blue.opacity(0.05),
-                                Color.cyan.opacity(0.03),
-                                Color.clear
-                            ],
+                            colors: [Color.blue.opacity(0.05), Color.cyan.opacity(0.02)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                 
-                // 主体材质
+                // 2. 核心材质：极致通透
                 RoundedRectangle(cornerRadius: 24)
                     .fill(.ultraThinMaterial)
                 
-                // 高光边框
+                // 3. 表面流光：使用 plusLighter 增强亮度（与刘海模式一致）
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(
+                        LinearGradient(
+                            colors: [.clear, .white.opacity(0.12), .clear],
+                            startPoint: UnitPoint(x: shimmerOffset, y: 0),
+                            endPoint: UnitPoint(x: shimmerOffset + 0.3, y: 1)
+                        )
+                    )
+                    .blendMode(.plusLighter)
+            }
+        )
+        .overlay(
+            ZStack {
+                // 4. 基础折射边框（与刘海模式一致）
                 RoundedRectangle(cornerRadius: 24)
                     .stroke(
                         LinearGradient(
-                            colors: [
-                                .white.opacity(0.4),
-                                .white.opacity(0.15),
-                                .white.opacity(0.05)
-                            ],
+                            colors: [.white.opacity(0.4), .white.opacity(0.1), .clear, .white.opacity(0.05)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
                         lineWidth: 1.2
                     )
                 
-                // 顶部高光
+                // 5. 极锐利镜面高光（与刘海模式一致）
                 RoundedRectangle(cornerRadius: 24)
-                    .fill(
+                    .stroke(
                         LinearGradient(
-                            colors: [.white.opacity(0.15), .clear],
-                            startPoint: .top,
-                            endPoint: .center
-                        )
+                            colors: [.white.opacity(0.8), .white.opacity(0.2), .clear],
+                            startPoint: .topLeading,
+                            endPoint: UnitPoint(x: 0.3, y: 0.3)
+                        ),
+                        lineWidth: 0.5
                     )
-                    .frame(height: 100)
-                    .clipped()
             }
         )
+        // 核心阴影系统（与刘海模式一致）
+        .shadow(color: .black.opacity(0.15), radius: 25, x: 0, y: 12)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(
-            color: .black.opacity(0.2),
-            radius: 40,
-            x: 0,
-            y: 20
-        )
     }
     
     private var menuGrid: some View {
@@ -392,18 +405,24 @@ struct FloatingOrbView: View {
             if items.isEmpty {
                 emptyState
             } else {
+                let iconSize = HubMetrics.floatingOrbItemSize
                 ScrollView(showsIndicators: false) {
                     LazyVGrid(
                         columns: [
-                            GridItem(.fixed(60), spacing: 10),
-                            GridItem(.fixed(60), spacing: 10),
-                            GridItem(.fixed(60), spacing: 10),
-                            GridItem(.fixed(60), spacing: 10)
+                            GridItem(.fixed(iconSize), spacing: 10),
+                            GridItem(.fixed(iconSize), spacing: 10),
+                            GridItem(.fixed(iconSize), spacing: 10),
+                            GridItem(.fixed(iconSize), spacing: 10)
                         ],
                         spacing: 10
                     ) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            DraggableItemView(item: item, modelContext: modelContext)
+                            DraggableItemView(
+                                item: item,
+                                modelContext: modelContext,
+                                iconSize: iconSize,
+                                itemHeight: HubMetrics.floatingOrbItemHeight
+                            )
                                 .contextMenu {
                                     Button("删除") {
                                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { 
@@ -481,39 +500,62 @@ struct FloatingOrbView: View {
             .frame(width: menuWidth, height: menuHeight)
             .background(
                 ZStack {
+                    // 1. 内部深度：极淡的次表面色彩（与刘海模式一致）
                     RoundedRectangle(cornerRadius: 24)
                         .fill(
                             LinearGradient(
-                                colors: [
-                                    Color.blue.opacity(0.03),
-                                    Color.cyan.opacity(0.02),
-                                    Color.clear
-                                ],
+                                colors: [Color.blue.opacity(0.05), Color.cyan.opacity(0.02)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                     
+                    // 2. 核心材质：极致通透
                     RoundedRectangle(cornerRadius: 24)
                         .fill(.ultraThinMaterial)
                     
+                    // 3. 表面流光
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(
+                            LinearGradient(
+                                colors: [.clear, .white.opacity(0.12), .clear],
+                                startPoint: UnitPoint(x: shimmerOffset, y: 0),
+                                endPoint: UnitPoint(x: shimmerOffset + 0.3, y: 1)
+                            )
+                        )
+                        .blendMode(.plusLighter)
+                }
+            )
+            .overlay(
+                ZStack {
+                    // 4. 基础折射边框（与刘海模式一致）
                     RoundedRectangle(cornerRadius: 24)
                         .stroke(
                             LinearGradient(
-                                colors: [
-                                    .white.opacity(0.4),
-                                    .white.opacity(0.15),
-                                    .white.opacity(0.05)
-                                ],
+                                colors: [.white.opacity(0.4), .white.opacity(0.1), .clear, .white.opacity(0.05)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
                             lineWidth: 1.2
                         )
+                    
+                    // 5. 极锐利镜面高光（与刘海模式一致）
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.white.opacity(0.8), .white.opacity(0.2), .clear],
+                                startPoint: .topLeading,
+                                endPoint: UnitPoint(x: 0.3, y: 0.3)
+                            ),
+                            lineWidth: 0.5
+                        )
                 }
             )
+            // 核心阴影系统（与刘海模式一致）
+            .shadow(color: .black.opacity(0.15), radius: 25, x: 0, y: 12)
+            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
             .clipShape(RoundedRectangle(cornerRadius: 24))
-            .shadow(color: .black.opacity(0.2), radius: 40, x: 0, y: 20)
     }
     
     private var confirmationContent: some View {

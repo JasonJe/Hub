@@ -28,13 +28,18 @@ struct StashedContentView: View {
     
     @Environment(\.modelContext) private var modelContext
     
+    /// 图标尺寸（刘海模式使用较小尺寸）
+    private var iconSize: CGFloat { HubMetrics.dynamicIslandItemSize }
+    
     /// 文件网格列配置
-    let columns = [
-        GridItem(.fixed(64), spacing: 8),
-        GridItem(.fixed(64), spacing: 8),
-        GridItem(.fixed(64), spacing: 8),
-        GridItem(.fixed(64), spacing: 8)
-    ]
+    var columns: [GridItem] {
+        [
+            GridItem(.fixed(iconSize), spacing: 8),
+            GridItem(.fixed(iconSize), spacing: 8),
+            GridItem(.fixed(iconSize), spacing: 8),
+            GridItem(.fixed(iconSize), spacing: 8)
+        ]
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -151,7 +156,12 @@ struct StashedContentView: View {
     private var populatedGrid: some View {
         LazyVGrid(columns: columns, spacing: 8) {
             ForEach(items) { item in
-                DraggableItemView(item: item, modelContext: modelContext)
+                DraggableItemView(
+                    item: item,
+                    modelContext: modelContext,
+                    iconSize: iconSize,
+                    itemHeight: HubMetrics.dynamicIslandItemHeight
+                )
                     .contextMenu {
                         Button("删除") {
                             modelContext.delete(item)

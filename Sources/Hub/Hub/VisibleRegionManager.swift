@@ -157,16 +157,30 @@ class VisibleRegionManager {
     ///   - threshold: 最小可见比例（默认 0.8，即 80%）
     /// - Returns: 是否大部分在可见区域内
     func mostlyContains(_ rect: CGRect, threshold: CGFloat = 0.8) -> Bool {
+        // 输入验证：无效矩形
+        guard rect.width > 0 && rect.height > 0 else {
+            HubLogger.log("⚠️ mostlyContains: 无效矩形尺寸")
+            return false
+        }
+        
+        // 输入验证：阈值范围
+        let validThreshold = max(0, min(1, threshold))
+        
         let visibleArea = calculateVisibleArea(for: rect)
         let totalArea = rect.width * rect.height
         let ratio = visibleArea / totalArea
-        return ratio >= threshold
+        return ratio >= validThreshold
     }
     
     /// 计算矩形在可见区域内的面积
     /// - Parameter rect: 要计算的矩形
     /// - Returns: 可见面积
     func calculateVisibleArea(for rect: CGRect) -> CGFloat {
+        // 输入验证：无效矩形返回 0
+        guard rect.width > 0 && rect.height > 0 else {
+            return 0
+        }
+        
         var totalVisibleArea: CGFloat = 0
         
         for visibleRect in visibleRects {
@@ -250,6 +264,15 @@ class VisibleRegionManager {
     ///   - padding: 距离边缘的最小距离（默认 0）
     /// - Returns: 移动后的矩形原点
     func clampRectToVisibleRegion(_ rect: CGRect, padding: CGFloat = 0) -> CGPoint {
+        // 输入验证：无效矩形尺寸
+        guard rect.width > 0 && rect.height > 0 else {
+            HubLogger.log("⚠️ clampRectToVisibleRegion: 无效矩形尺寸，返回原点")
+            return rect.origin
+        }
+        
+        // 输入验证：负数 padding 修正为 0
+        let safePadding = max(0, padding)
+        
         let center = CGPoint(x: rect.midX, y: rect.midY)
         
         HubLogger.log("  📐 clampRectToVisibleRegion:")
@@ -263,7 +286,7 @@ class VisibleRegionManager {
         
         // 找到包含中心点的区域
         for visibleRect in visibleRects {
-            let paddedRect = visibleRect.insetBy(dx: padding, dy: padding)
+            let paddedRect = visibleRect.insetBy(dx: safePadding, dy: safePadding)
             if paddedRect.contains(center) {
                 // 中心点在区域内，检查整个矩形是否在区域内
                 let clampedOrigin = clampRect(rect, to: paddedRect)
@@ -283,7 +306,7 @@ class VisibleRegionManager {
         
         // 不在任何区域内，找到最近的区域
         if let (nearestRect, _) = distanceToNearestVisibleRegion(from: center) {
-            let paddedRect = nearestRect.insetBy(dx: padding, dy: padding)
+            let paddedRect = nearestRect.insetBy(dx: safePadding, dy: safePadding)
             let result = clampRect(rect, to: paddedRect)
             HubLogger.log("    中心点不在任何区域内，最近区域: \(nearestRect)")
             HubLogger.log("    结果: (\(result.x), \(result.y))")
@@ -292,7 +315,7 @@ class VisibleRegionManager {
         
         // 兜底：返回第一个区域的左下角
         if let firstRect = visibleRects.first {
-            let paddedRect = firstRect.insetBy(dx: padding, dy: padding)
+            let paddedRect = firstRect.insetBy(dx: safePadding, dy: safePadding)
             let result = CGPoint(x: paddedRect.minX, y: paddedRect.minY)
             HubLogger.log("    兜底返回第一个区域: \(firstRect)")
             HubLogger.log("    结果: (\(result.x), \(result.y))")

@@ -12,6 +12,47 @@ import Combine
 import UniformTypeIdentifiers
 import SwiftData
 
+// MARK: - 拖拽检测状态管理
+
+/// 拖拽检测状态管理类
+private class DragDetectionState {
+    var mouseDownMonitor: Any?
+    var mouseDraggedMonitor: Any?
+    var mouseUpMonitor: Any?
+    var pasteboardChangeCount: Int = -1
+    var isDragging: Bool = false
+    var isContentDragging: Bool = false
+    let dragPasteboard = NSPasteboard(name: .drag)
+    
+    /// 清理所有监听器
+    func cleanup() {
+        [mouseDownMonitor, mouseDraggedMonitor, mouseUpMonitor].forEach { monitor in
+            if let monitor = monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+        }
+        mouseDownMonitor = nil
+        mouseDraggedMonitor = nil
+        mouseUpMonitor = nil
+        isDragging = false
+        isContentDragging = false
+    }
+    
+    deinit {
+        cleanup()
+    }
+}
+
+/// 弱引用包装器 - 用于在闭包中安全引用 DragDetectionState
+private class WeakDragState {
+    weak var value: DragDetectionState?
+    init(value: DragDetectionState?) {
+        self.value = value
+    }
+}
+
+// MARK: - 悬浮球窗口管理器
+
 /// 悬浮球窗口管理器
 @MainActor
 class OrbWindowManager: ObservableObject {
@@ -19,10 +60,7 @@ class OrbWindowManager: ObservableObject {
     
     private var orbPanel: FloatingPanel?
     private var orbViewModel = OrbViewModel()
-    
-    // 悬浮球尺寸（50px = 30px球 + 10px*2边距，增大15%）
-    private let orbSize: CGFloat = 30
-    private let orbWindowSize: CGFloat = 50
+    private var dragDetectionState = DragDetectionState()
     
     /// 当前角落位置
     @Published var currentCorner: ScreenCorner = .bottomRight
@@ -40,16 +78,102 @@ class OrbWindowManager: ObservableObject {
         }
         
         createOrbWindow()
+        
+        // 延迟启动拖拽检测
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.startDragDetection()
+        }
     }
     
     /// 关闭悬浮球窗口
     func closeWindow() {
+        // 停止拖拽检测
+        stopDragDetection()
+        
         // 清除回调
         VisibleRegionManager.shared.onScreenConfigurationChanged = nil
         
         orbPanel?.close()
         orbPanel = nil
         HubLogger.log("悬浮球窗口已关闭")
+    }
+    
+    // MARK: - 拖拽检测
+    
+    /// 开始检测文件拖拽（全局监听）
+    private func startDragDetection() {
+        // 确保先清理旧的监听器
+        dragDetectionState.cleanup()
+        
+        HubLogger.log("🟣 开始监听文件拖拽（全局鼠标事件）")
+        
+        // 使用弱引用避免循环引用
+        let weakDragState = WeakDragState(value: dragDetectionState)
+        weak var weakViewModel = orbViewModel
+        
+        // 鼠标按下 - 记录粘贴板状态
+        dragDetectionState.mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { _ in
+            guard let dragState = weakDragState.value else { return }
+            dragState.pasteboardChangeCount = dragState.dragPasteboard.changeCount
+            dragState.isDragging = true
+            dragState.isContentDragging = false
+            HubLogger.log("🟣 鼠标按下，准备检测拖拽")
+        }
+        
+        // 鼠标移动 - 检测是否开始拖拽文件
+        dragDetectionState.mouseDraggedMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged]) { _ in
+            guard let dragState = weakDragState.value, dragState.isDragging else { return }
+            
+            // 检测粘贴板变化，确认是内容拖拽
+            if !dragState.isContentDragging && dragState.dragPasteboard.changeCount != dragState.pasteboardChangeCount {
+                let hasFileURL = dragState.dragPasteboard.types?.contains(.fileURL) == true
+                if hasFileURL {
+                    dragState.isContentDragging = true
+                    HubLogger.log("🟣 检测到文件拖拽，自动展开 Hub")
+                    
+                    DispatchQueue.main.async {
+                        if let viewModel = weakViewModel, !viewModel.isExpanded {
+                            viewModel.isExpanded = true
+                            OrbWindowManager.shared.showHubWindow()
+                            
+                            // 通知 Hub 显示拖拽过渡效果
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                NotificationCenter.default.post(
+                                    name: .hubShowDragOverlay,
+                                    object: nil,
+                                    userInfo: ["isDragging": true]
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 鼠标松开 - 拖拽结束
+        dragDetectionState.mouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp]) { _ in
+            guard let dragState = weakDragState.value else { return }
+            if dragState.isContentDragging {
+                HubLogger.log("🟣 文件拖拽结束")
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: .hubShowDragOverlay,
+                        object: nil,
+                        userInfo: ["isDragging": false]
+                    )
+                }
+            }
+            
+            dragState.isDragging = false
+            dragState.isContentDragging = false
+            dragState.pasteboardChangeCount = -1
+        }
+    }
+    
+    /// 停止拖拽检测
+    private func stopDragDetection() {
+        dragDetectionState.cleanup()
+        HubLogger.log("🟣 停止监听文件拖拽")
     }
     
     /// 创建悬浮球窗口
@@ -153,7 +277,7 @@ class OrbWindowManager: ObservableObject {
         
         var x = settings.floatingX
         var y = settings.floatingY
-        let rect = NSRect(x: x, y: y, width: orbWindowSize, height: orbWindowSize)
+        let rect = NSRect(x: x, y: y, width: HubMetrics.orbWindowSize, height: HubMetrics.orbWindowSize)
         
         // 检查球体是否大部分在可见区域内
         let isValidPosition = VisibleRegionManager.shared.mostlyContains(rect, threshold: 0.8)
@@ -163,11 +287,11 @@ class OrbWindowManager: ObservableObject {
             // 找到主屏幕的可见区域
             if let mainScreen = ScreenManager.shared.getMainScreen() {
                 let visibleFrame = mainScreen.visibleFrame
-                x = visibleFrame.maxX - orbWindowSize - 12
+                x = visibleFrame.maxX - HubMetrics.orbWindowSize - 12
                 y = visibleFrame.minY + 12
             } else {
                 // 兜底：使用可见区域管理器的第一个区域
-                let defaultRect = NSRect(x: 100, y: 100, width: orbWindowSize, height: orbWindowSize)
+                let defaultRect = NSRect(x: 100, y: 100, width: HubMetrics.orbWindowSize, height: HubMetrics.orbWindowSize)
                 let clampedOrigin = VisibleRegionManager.shared.clampRectToVisibleRegion(defaultRect)
                 x = clampedOrigin.x
                 y = clampedOrigin.y
@@ -187,14 +311,14 @@ class OrbWindowManager: ObservableObject {
             updateCurrentCorner(x: x, y: y, screen: screen)
         }
 
-        return NSRect(x: x, y: y, width: orbWindowSize, height: orbWindowSize)
+        return NSRect(x: x, y: y, width: HubMetrics.orbWindowSize, height: HubMetrics.orbWindowSize)
     }
     
     /// 更新当前角落
     private func updateCurrentCorner(x: CGFloat, y: CGFloat, screen: NSScreen) {
         let visibleFrame = screen.visibleFrame
-        let centerX = x + orbWindowSize / 2
-        let centerY = y + orbWindowSize / 2
+        let centerX = x + HubMetrics.orbWindowSize / 2
+        let centerY = y + HubMetrics.orbWindowSize / 2
         let midX = visibleFrame.midX
         let midY = visibleFrame.midY
 
@@ -310,103 +434,10 @@ class OrbViewModel: ObservableObject {
     @Published var isDropTarget = false  // 拖拽悬停状态
 }
 
-/// 拖拽检测状态管理类
-private class DragDetectionState {
-    var mouseDownMonitor: Any?
-    var mouseDraggedMonitor: Any?
-    var mouseUpMonitor: Any?
-    var pasteboardChangeCount: Int = -1
-    var isDragging: Bool = false
-    var isContentDragging: Bool = false
-    let dragPasteboard = NSPasteboard(name: .drag)
-}
-
 /// 悬浮球按钮视图 - 液态玻璃风格
 struct FloatingOrbButton: View {
     @ObservedObject var viewModel: OrbViewModel
     @State private var lastMouseLocation: NSPoint?
-    @State private var dragState = DragDetectionState()
-    
-    // 悬浮球尺寸（再增大10%）
-    private let orbSize: CGFloat = 36
-    private let windowSize: CGFloat = 61  // 36 + 12.5*2 ≈ 61
-    
-    /// 开始检测文件拖拽
-    private func startDragDetection() {
-        stopDragDetection()
-        
-        HubLogger.log("🟣 开始监听文件拖拽（全局鼠标事件）")
-        
-        // 鼠标按下 - 记录粘贴板状态
-        dragState.mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [dragState] _ in
-            dragState.pasteboardChangeCount = dragState.dragPasteboard.changeCount
-            dragState.isDragging = true
-            dragState.isContentDragging = false
-            HubLogger.log("🟣 鼠标按下，准备检测拖拽")
-        }
-        
-        // 鼠标移动 - 检测是否开始拖拽文件
-        dragState.mouseDraggedMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged]) { [weak viewModel, dragState] event in
-            guard dragState.isDragging else { return }
-            
-            // 检测粘贴板变化，确认是内容拖拽
-            if !dragState.isContentDragging && dragState.dragPasteboard.changeCount != dragState.pasteboardChangeCount {
-                let hasFileURL = dragState.dragPasteboard.types?.contains(.fileURL) == true
-                if hasFileURL {
-                    dragState.isContentDragging = true
-                    HubLogger.log("🟣 检测到文件拖拽，自动展开 Hub")
-                    
-                    DispatchQueue.main.async {
-                        if let viewModel = viewModel, !viewModel.isExpanded {
-                            viewModel.isExpanded = true
-                            OrbWindowManager.shared.showHubWindow()
-                            
-                            // 通知 Hub 显示拖拽过渡效果
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                NotificationCenter.default.post(
-                                    name: .hubShowDragOverlay,
-                                    object: nil,
-                                    userInfo: ["isDragging": true]
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // 鼠标松开 - 拖拽结束
-        dragState.mouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp]) { [dragState] _ in
-            if dragState.isContentDragging {
-                HubLogger.log("🟣 文件拖拽结束")
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(
-                        name: .hubShowDragOverlay,
-                        object: nil,
-                        userInfo: ["isDragging": false]
-                    )
-                }
-            }
-            
-            dragState.isDragging = false
-            dragState.isContentDragging = false
-            dragState.pasteboardChangeCount = -1
-        }
-    }
-    
-    /// 停止拖拽检测
-    private func stopDragDetection() {
-        [dragState.mouseDownMonitor, dragState.mouseDraggedMonitor, dragState.mouseUpMonitor].forEach { monitor in
-            if let monitor = monitor {
-                NSEvent.removeMonitor(monitor)
-            }
-        }
-        dragState.mouseDownMonitor = nil
-        dragState.mouseDraggedMonitor = nil
-        dragState.mouseUpMonitor = nil
-        dragState.isDragging = false
-        dragState.isContentDragging = false
-    }
     
     var body: some View {
         ZStack {
@@ -423,7 +454,7 @@ struct FloatingOrbButton: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .frame(width: orbSize, height: orbSize)
+                .frame(width: HubMetrics.orbVisualSize, height: HubMetrics.orbVisualSize)
                 .overlay(
                     Circle()
                         .fill(.ultraThinMaterial)
@@ -438,7 +469,7 @@ struct FloatingOrbButton: View {
                                 endPoint: .bottom
                             )
                         )
-                        .frame(height: orbSize * 0.55)
+                        .frame(height: HubMetrics.orbVisualSize * 0.55)
                         .clipped(),
                     alignment: .top
                 )
@@ -502,19 +533,8 @@ struct FloatingOrbButton: View {
             }
             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: viewModel.isExpanded)
         }
-        .frame(width: windowSize, height: windowSize)
+        .frame(width: HubMetrics.orbWindowSize, height: HubMetrics.orbWindowSize)
         .contentShape(Rectangle())
-        .onAppear {
-            // 延迟 2 秒后开始监听拖拽粘贴板，避免启动时误触发
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                HubLogger.log("🟣 延迟 2 秒后开始监听文件拖拽")
-                startDragDetection()
-            }
-        }
-        .onDisappear {
-            // 停止监听
-            stopDragDetection()
-        }
         .onHover { hovering in
             viewModel.isHovering = hovering
             
